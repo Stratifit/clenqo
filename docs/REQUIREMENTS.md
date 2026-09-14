@@ -1,0 +1,1331 @@
+# CLENQO — System Requirements
+
+> **Clean Spaces. Better Living.**
+
+## 1. Purpose
+
+This document defines the functional and high-level non-functional requirements for the CLENQO platform.
+
+It describes what the system must be capable of doing without prescribing every implementation detail.
+
+Detailed technical architecture is defined in:
+
+```text
+docs/ARCHITECTURE.md
+```
+
+Detailed business rules are defined in the relevant domain documents.
+
+OpenSpec specifications will translate major requirements into implementation-ready specifications.
+
+---
+
+# 2. Product Scope
+
+CLENQO consists of the following major system areas:
+
+```text
+CLENQO
+│
+├── HQ Administration
+├── Branch Management
+├── Branch Website System
+├── Customer Experience
+├── Booking System
+├── Pricing Engine
+├── Service Management
+├── Employee/Cleaner System
+├── Scheduling & Assignment
+├── Payments
+├── Invoicing
+├── Notifications
+├── Reviews & Quality
+├── Reporting & Analytics
+├── Authentication & Authorization
+├── Localization
+└── Platform Administration
+```
+
+---
+
+# 3. User Types
+
+The system must support distinct user types and permission scopes.
+
+## 3.1 HQ Administrator
+
+Global CLENQO administrator.
+
+Can manage the entire organization and all branches.
+
+## 3.2 HQ Staff
+
+Optional internal staff with configurable permissions.
+
+May have access to selected areas without having unrestricted administrative access.
+
+## 3.3 Branch Manager
+
+Responsible for day-to-day operation of one or more assigned branches.
+
+## 3.4 Cleaner / Employee
+
+Responsible for completing assigned cleaning jobs.
+
+## 3.5 Customer
+
+Books and manages cleaning services.
+
+## 3.6 System/Automation
+
+Internal automated processes that perform scheduled or event-driven operations.
+
+---
+
+# 4. Organization Requirements
+
+The platform must support a central CLENQO organization.
+
+The organization represents the overall CLENQO business.
+
+It must contain:
+
+* Organization identity
+* Global configuration
+* Global branding
+* Global services
+* Global defaults
+* Branches
+* Users
+* Organization-level settings
+
+The initial architecture must not assume multiple organizations unless this is later required.
+
+---
+
+# 5. Branch Requirements
+
+## BR-001 — Branch Creation
+
+HQ administrators must be able to create a branch.
+
+A branch should contain at minimum:
+
+* Name
+* Slug
+* Country
+* City
+* Address
+* Contact information
+* Status
+* Service area
+* Opening hours
+* Manager assignment
+
+---
+
+## BR-002 — Branch Status
+
+A branch must have an explicit lifecycle/status.
+
+Initial statuses may include:
+
+```text
+DRAFT
+ACTIVE
+PAUSED
+SUSPENDED
+CLOSED
+```
+
+Exact states will be finalized in the branch specification.
+
+---
+
+## BR-003 — Branch Configuration
+
+HQ must be able to configure branch-specific:
+
+* Business information
+* Contact details
+* Service area
+* Opening hours
+* Services
+* Pricing
+* Booking settings
+* Notification settings
+* Website content
+* Local promotions
+
+---
+
+## BR-004 — Branch Isolation
+
+Branch operational data must be isolated.
+
+A branch user must only access data permitted for their branch scope.
+
+---
+
+## BR-005 — Branch Manager Assignment
+
+HQ administrators must be able to assign one or more authorized users as branch managers.
+
+---
+
+## BR-006 — Branch Activation
+
+A branch should not become publicly bookable until required configuration is complete.
+
+The system should validate required configuration before activation.
+
+---
+
+# 6. Automatic Branch Provisioning
+
+## BP-001 — Automatic Provisioning
+
+When HQ creates a branch, the system must be capable of provisioning the branch's initial digital environment.
+
+Provisioning should include, where applicable:
+
+* Branch configuration
+* Website configuration
+* Default website pages
+* Default services
+* Pricing configuration
+* Booking configuration
+* Dashboard context
+* Notification configuration
+
+---
+
+## BP-002 — Provisioning Safety
+
+Provisioning must be:
+
+* Deterministic
+* Validated
+* Auditable
+* Safe to retry
+
+Partial failures must be detectable and recoverable.
+
+---
+
+## BP-003 — No Duplicated Code
+
+Creating a branch must not create a new application or duplicated frontend codebase.
+
+All branches use the central CLENQO platform.
+
+---
+
+# 7. Website Requirements
+
+## WS-001 — Master Website
+
+CLENQO must provide a reusable master website system.
+
+The system must support:
+
+* Reusable page structures
+* Reusable components
+* Global design system
+* Localized content
+* Branch-specific configuration
+
+---
+
+## WS-002 — Branch Website
+
+Each active branch must be capable of having a localized public website experience.
+
+The website should include:
+
+* Homepage
+* Services
+* Pricing
+* About
+* FAQ
+* Contact
+* Reviews
+* Booking entry point
+
+The exact page structure may evolve.
+
+---
+
+## WS-003 — Branch Localization
+
+Branch websites must display the appropriate:
+
+* Branch name
+* Location
+* Contact information
+* Service area
+* Services
+* Pricing
+* Opening hours
+* Local content
+* Local reviews
+
+---
+
+## WS-004 — SEO
+
+Branch websites must support localized SEO.
+
+The system should support:
+
+* Unique page titles
+* Meta descriptions
+* Canonical URLs
+* Structured data
+* Local business information
+* Sitemap generation
+* Search-engine-friendly URLs
+
+---
+
+## WS-005 — Responsive Design
+
+Public websites must work across:
+
+* Mobile
+* Tablet
+* Desktop
+
+---
+
+# 8. Localization Requirements
+
+CLENQO must be multilingual from the beginning.
+
+Initial languages:
+
+```text
+de — German
+en — English
+fr — French
+es — Spanish
+```
+
+The architecture must allow additional languages to be added later.
+
+---
+
+## LO-001 — Interface Localization
+
+Relevant user interfaces must support the configured languages.
+
+---
+
+## LO-002 — Content Localization
+
+Content should be capable of having localized versions rather than relying entirely on machine translation at runtime.
+
+---
+
+## LO-003 — User Language Preference
+
+Where appropriate, the system should remember the user's preferred language.
+
+---
+
+## LO-004 — Communication Localization
+
+Customer-facing communications should use the customer's selected/preferred language where available.
+
+This may include:
+
+* Emails
+* Booking confirmations
+* Reminders
+* Cancellation notices
+* Payment messages
+* Review requests
+
+---
+
+# 9. Service Requirements
+
+## SV-001 — Service Catalog
+
+CLENQO must maintain a structured service catalog.
+
+Initial service categories may include:
+
+* Home Cleaning
+* Business Cleaning
+* Deep Cleaning
+* Move-In / Move-Out Cleaning
+
+---
+
+## SV-002 — Service Variants
+
+Services may contain sub-services or variants.
+
+Examples:
+
+```text
+Home Cleaning
+├── Regular Cleaning
+├── Deep Cleaning
+├── Recurring Cleaning
+└── Eco-Friendly Cleaning
+
+Move-In / Move-Out
+├── Move-In
+└── Move-Out
+```
+
+---
+
+## SV-003 — Add-ons
+
+The system must support optional add-ons.
+
+Examples:
+
+* Oven cleaning
+* Refrigerator cleaning
+* Window cleaning
+* Interior cabinets
+* Laundry
+* Other approved additional services
+
+---
+
+## SV-004 — Branch Availability
+
+Services must be capable of being enabled or disabled for individual branches.
+
+---
+
+# 10. Pricing Requirements
+
+## PR-001 — Pricing Engine
+
+CLENQO must have a dedicated pricing engine.
+
+Pricing must not be duplicated across UI components.
+
+---
+
+## PR-002 — Pricing Inputs
+
+The pricing engine should be capable of considering:
+
+* Service type
+* Property characteristics
+* Estimated duration
+* Difficulty
+* Add-ons
+* Recurrence
+* Surcharges
+* Discounts
+* Branch pricing configuration
+
+---
+
+## PR-003 — Difficulty
+
+The system should support configurable difficulty classifications.
+
+Initial conceptual levels:
+
+```text
+LIGHT
+MEDIUM
+HEAVY
+```
+
+Difficulty multipliers must be configurable rather than hardcoded permanently.
+
+---
+
+## PR-004 — Surcharges
+
+The pricing system should support configurable surcharges such as:
+
+* Night
+* Sunday
+* Holiday
+* Emergency
+
+Exact rates belong in the pricing specification.
+
+---
+
+## PR-005 — Pricing Profiles
+
+Branches should be able to use:
+
+```text
+Global Default Pricing
+```
+
+or:
+
+```text
+Custom Branch Pricing
+```
+
+subject to HQ permissions.
+
+---
+
+## PR-006 — Price Transparency
+
+Customers should receive a clear price or price estimate before booking confirmation whenever the service supports deterministic online pricing.
+
+---
+
+# 11. Booking Requirements
+
+## BK-001 — Online Booking
+
+Customers must be able to create bookings online.
+
+---
+
+## BK-002 — No Mandatory Customer Account
+
+Customers must not be required to create a traditional account to make an initial booking.
+
+---
+
+## BK-003 — Booking Information
+
+The booking flow should collect the information necessary to:
+
+* Identify the customer
+* Determine the service
+* Determine the property requirements
+* Calculate pricing
+* Determine availability
+* Deliver the service
+* Communicate with the customer
+
+---
+
+## BK-004 — Date and Time
+
+Customers must be able to select available service dates and time windows.
+
+The system must prevent invalid or conflicting bookings.
+
+---
+
+## BK-005 — Instant Pricing
+
+Where sufficient information is available, the system should calculate the price before the customer confirms the booking.
+
+---
+
+## BK-006 — Booking Confirmation
+
+After a successful booking, the customer should receive confirmation.
+
+---
+
+## BK-007 — Booking Management
+
+Customers must be able to manage bookings using secure magic links.
+
+Supported operations may include:
+
+* View
+* Reschedule
+* Cancel
+* View details
+* Rebook
+
+Permissions depend on booking status and applicable policies.
+
+---
+
+# 12. Booking Lifecycle
+
+Bookings must use explicit states.
+
+The initial lifecycle should support concepts such as:
+
+```text
+DRAFT
+PENDING
+CONFIRMED
+ASSIGNED
+IN_PROGRESS
+COMPLETED
+CANCELLED
+NO_SHOW
+FAILED
+```
+
+The exact transition rules will be defined in `BOOKING_SYSTEM.md`.
+
+Invalid state transitions must be prevented.
+
+---
+
+# 13. Recurring Bookings
+
+The system must eventually support recurring cleaning.
+
+Potential frequencies:
+
+* Weekly
+* Every two weeks
+* Monthly
+* Custom recurring schedule
+
+Recurring bookings must generate or manage future service occurrences safely.
+
+---
+
+# 14. Cancellation Requirements
+
+The booking system must support cancellation policies.
+
+The policy should be configurable and capable of considering the time remaining before the booking.
+
+The initial business policy may support different cancellation charges based on cancellation timing.
+
+Exact values will be defined in the business/pricing documentation.
+
+---
+
+# 15. Customer Requirements
+
+## CU-001 — Customer Record
+
+The system must maintain customer records necessary for service delivery.
+
+---
+
+## CU-002 — Customer History
+
+Authorized staff should be able to view relevant customer booking history.
+
+---
+
+## CU-003 — Customer Privacy
+
+Customer information must only be accessible to authorized users.
+
+---
+
+## CU-004 — Rebooking
+
+Customers should have a simple path to book the same or similar service again.
+
+---
+
+# 16. Employee Requirements
+
+## EM-001 — Employee Records
+
+The system must support employee records including:
+
+* Name
+* Contact information
+* Branch assignment
+* Employment status
+* Availability
+* Skills where required
+* Operational metadata
+
+---
+
+## EM-002 — Employee Status
+
+Employee availability/status must be explicit.
+
+Potential statuses:
+
+```text
+ACTIVE
+INACTIVE
+ON_LEAVE
+SUSPENDED
+```
+
+---
+
+## EM-003 — Branch Assignment
+
+Employees must be associated with one or more authorized branches according to business rules.
+
+---
+
+# 17. Cleaner PWA Requirements
+
+The cleaner experience must be mobile-first.
+
+It should provide:
+
+* Authentication
+* Today's jobs
+* Upcoming jobs
+* Job details
+* Customer information
+* Service requirements
+* Cleaning checklist
+* Check-in
+* Check-out
+* Job notes
+* Photo upload
+* Incident reporting
+* Completion status
+
+---
+
+# 18. Scheduling Requirements
+
+The platform must support operational scheduling.
+
+Scheduling must consider:
+
+* Booking date
+* Booking time/window
+* Employee availability
+* Employee working hours
+* Branch
+* Service requirements
+* Existing assignments
+
+Future versions may additionally consider:
+
+* Travel time
+* Distance
+* Skills
+* Workload balancing
+
+---
+
+# 19. Worker Assignment Requirements
+
+The system must support assigning employees to jobs.
+
+Assignment may initially be manual.
+
+The architecture must allow future automated assignment.
+
+Potential factors include:
+
+```text
+Branch
+Service area
+Availability
+Working hours
+Skills
+Job duration
+Existing schedule
+Travel distance
+Employee workload
+```
+
+---
+
+# 20. Job Execution Requirements
+
+A booking may produce an operational job.
+
+A job should support:
+
+* Assigned employee(s)
+* Scheduled time
+* Service details
+* Customer information
+* Checklist
+* Status
+* Notes
+* Photos
+* Check-in time
+* Check-out time
+* Completion information
+
+---
+
+# 21. Quality Requirements
+
+CLENQO should support quality management.
+
+Potential capabilities include:
+
+* Cleaning checklists
+* Customer ratings
+* Reviews
+* Complaint records
+* Re-clean requests
+* Incident reports
+* Before/after photos
+* Quality review
+
+---
+
+# 22. Review Requirements
+
+Customers should be able to leave reviews after completed services.
+
+The system should support:
+
+* Rating
+* Optional written review
+* Booking association
+* Branch association
+* Moderation
+* Publication status
+
+---
+
+# 23. Payment Requirements
+
+The platform must support secure payment workflows.
+
+Potential payment methods include:
+
+* Credit/debit card
+* PayPal
+* SEPA
+* Apple Pay
+* Google Pay
+* Bank transfer
+* Approved cash payments
+
+Available payment methods may vary by branch and business policy.
+
+---
+
+# 24. Payment Security
+
+The application must never trust payment status supplied by the browser.
+
+Payment state must be confirmed through trusted server-side mechanisms and provider events.
+
+Financial records must be auditable.
+
+---
+
+# 25. Invoicing Requirements
+
+The system should support:
+
+* Customer invoices
+* Receipts
+* Invoice status
+* Payment association
+* Refund records
+* Invoice numbering
+* Branch association
+
+---
+
+# 26. Notification Requirements
+
+The platform must support event-driven notifications.
+
+Potential events include:
+
+```text
+Booking Created
+Booking Confirmed
+Booking Rescheduled
+Booking Cancelled
+Booking Assigned
+Booking Reminder
+Cleaner Check-In
+Job Completed
+Payment Received
+Payment Failed
+Review Request
+```
+
+Initial communication channel:
+
+```text
+Email
+```
+
+Future channel:
+
+```text
+WhatsApp
+```
+
+---
+
+# 27. Notification Preferences
+
+Where appropriate, customers and employees should be able to have notification preferences.
+
+The system must respect applicable communication and consent requirements.
+
+---
+
+# 28. HQ Dashboard Requirements
+
+HQ should have a centralized dashboard providing visibility across the organization.
+
+Potential dashboard information:
+
+* Total bookings
+* Revenue
+* Active branches
+* Active employees
+* Customers
+* Operational alerts
+* Booking status
+* Branch performance
+* Payment status
+* Quality metrics
+
+---
+
+# 29. Branch Dashboard Requirements
+
+Branch managers should have a branch-specific dashboard.
+
+It should provide visibility into:
+
+* Today's bookings
+* Upcoming bookings
+* Employees
+* Schedule
+* Customers
+* Revenue
+* Operational issues
+* Reviews
+* Branch performance
+
+---
+
+# 30. Branch Management Requirements
+
+HQ must be able to:
+
+* Create branches
+* Edit branches
+* Activate branches
+* Pause branches
+* Close branches
+* Assign managers
+* Configure service areas
+* Configure services
+* Configure pricing
+* Manage branch website configuration
+* View branch performance
+
+---
+
+# 31. Content Management Requirements
+
+CLENQO must support centralized and branch-specific content.
+
+Content should distinguish between:
+
+```text
+GLOBAL CONTENT
+```
+
+and:
+
+```text
+BRANCH CONTENT
+```
+
+Examples of global content:
+
+* Brand information
+* Core company pages
+* Global policies
+
+Examples of branch content:
+
+* Local introduction
+* Local service area
+* Local contact information
+* Local reviews
+* Local promotions
+
+---
+
+# 32. Authentication Requirements
+
+The system must support secure authentication for:
+
+* HQ users
+* Branch managers
+* Employees
+
+Customer booking access may use secure magic-link mechanisms.
+
+Authentication must support secure session management.
+
+---
+
+# 33. Authorization Requirements
+
+Permissions must be role- and scope-aware.
+
+The system must support:
+
+```text
+Global permissions
+Branch permissions
+Resource permissions
+```
+
+Authorization must be enforced server-side.
+
+---
+
+# 34. Security Requirements
+
+The platform must implement:
+
+* Row Level Security
+* Server-side authorization
+* Input validation
+* Secure authentication
+* Secure token handling
+* Secret management
+* Audit logging for critical operations
+* Protection against unauthorized branch access
+
+---
+
+# 35. Localization Requirements
+
+The platform must support:
+
+```text
+German
+English
+French
+Spanish
+```
+
+Localization must be designed as an extensible system.
+
+---
+
+# 36. Search Requirements
+
+Relevant administrative interfaces should support search.
+
+Potential search targets:
+
+* Customers
+* Bookings
+* Employees
+* Branches
+* Invoices
+* Reviews
+
+Large datasets should use appropriate indexing and pagination.
+
+---
+
+# 37. Reporting Requirements
+
+The system should provide reporting for:
+
+### Branches
+
+* Revenue
+* Bookings
+* Customers
+* Employee utilization
+* Completion rate
+* Ratings
+
+### HQ
+
+* Branch comparison
+* Network revenue
+* Growth
+* Customer retention
+* Operational performance
+* Financial performance
+
+---
+
+# 38. Analytics Requirements
+
+The platform should track meaningful operational events.
+
+Examples:
+
+```text
+Website Visit
+Service Viewed
+Booking Started
+Booking Completed
+Booking Cancelled
+Payment Completed
+Job Completed
+Review Submitted
+Rebooking
+```
+
+Analytics must respect privacy requirements.
+
+---
+
+# 39. Audit Requirements
+
+Critical actions should be auditable.
+
+Examples:
+
+* Branch creation
+* Branch activation
+* Price changes
+* Permission changes
+* Booking changes
+* Payment actions
+* Refunds
+* Employee changes
+
+---
+
+# 40. Performance Requirements
+
+The platform should provide a fast user experience.
+
+Priorities include:
+
+* Fast public pages
+* Fast booking flow
+* Efficient database queries
+* Appropriate indexing
+* Pagination
+* Optimized assets
+* Minimal unnecessary client-side JavaScript
+
+---
+
+# 41. Accessibility Requirements
+
+The platform should support accessible interfaces.
+
+Requirements include:
+
+* Semantic HTML
+* Keyboard accessibility
+* Accessible forms
+* Visible focus states
+* Appropriate labels
+* Adequate contrast
+* Reduced-motion support
+
+---
+
+# 42. Mobile Requirements
+
+The following experiences must be highly usable on mobile:
+
+1. Customer website
+2. Customer booking
+3. Customer booking management
+4. Cleaner PWA
+
+Administrative interfaces should also provide responsive layouts where practical.
+
+---
+
+# 43. GDPR / Privacy Requirements
+
+The system must be designed to support applicable privacy obligations, including GDPR where applicable.
+
+Requirements include:
+
+* Data minimization
+* Access control
+* Appropriate retention
+* Secure handling
+* Privacy-aware analytics
+* Appropriate customer data management
+* Data export/deletion workflows where legally required
+
+Detailed legal requirements should be reviewed separately with appropriate professional advice.
+
+---
+
+# 44. Reliability Requirements
+
+Critical operations should be designed for reliability.
+
+Important workflows should handle:
+
+* Network failures
+* Duplicate requests
+* Retry behavior
+* Partial failures
+* Provider failures
+* Database errors
+
+Financial and booking operations require particular care against duplicate processing.
+
+---
+
+# 45. Observability Requirements
+
+Production systems should provide visibility into:
+
+* Application errors
+* Booking failures
+* Payment failures
+* Notification failures
+* Provisioning failures
+* Authentication failures
+* Critical database errors
+
+---
+
+# 46. Extensibility Requirements
+
+The architecture must allow future capabilities without requiring fundamental redesign.
+
+Potential future areas:
+
+* AI assistance
+* Route optimization
+* Advanced scheduling
+* WhatsApp
+* Additional languages
+* Additional payment providers
+* Additional service categories
+* Additional countries
+* Franchise/partner branches
+* White-label operations software
+
+Future capabilities should not unnecessarily complicate the initial system.
+
+---
+
+# 47. Non-Functional Priorities
+
+When requirements compete, prioritize:
+
+```text
+1. Security
+2. Business correctness
+3. Reliability
+4. User experience
+5. Maintainability
+6. Performance
+7. Scalability
+8. Development speed
+```
+
+Technology choices must serve these priorities.
+
+---
+
+# 48. MVP Scope
+
+The first production milestone should focus on the smallest complete operational foundation.
+
+### MVP Foundation
+
+```text
+✓ Authentication
+✓ Roles & permissions
+✓ Multi-branch architecture
+✓ HQ branch management
+✓ Branch creation
+✓ Branch configuration
+✓ Automatic branch provisioning
+✓ Master website system
+✓ Branch website
+✓ Basic services
+✓ Basic pricing
+✓ Booking
+✓ Customer confirmation
+✓ Branch dashboard
+```
+
+The following should come after the foundation:
+
+```text
+→ Cleaner PWA
+→ Advanced assignment
+→ Recurring bookings
+→ Payments
+→ Invoicing
+→ Notifications
+→ Quality management
+→ Analytics
+→ Automation
+```
+
+This ordering may be refined through OpenSpec.
+
+---
+
+# 49. Future Expansion
+
+The platform should eventually support:
+
+```text
+Multiple branches
+        ↓
+Multiple cities
+        ↓
+Multiple regions
+        ↓
+Potential international expansion
+```
+
+The architecture must not hardcode assumptions that prevent geographic expansion.
+
+---
+
+# 50. Requirement Traceability
+
+Major requirements should eventually map to:
+
+```text
+Requirement
+    ↓
+Domain Documentation
+    ↓
+OpenSpec Specification
+    ↓
+Implementation
+    ↓
+Tests
+```
+
+Each major implemented capability should be traceable back to an explicit requirement.
+
+---
+
+# 51. Current Priority
+
+The immediate priority is not to implement every requirement in this document.
+
+The immediate priority is to establish the foundation:
+
+```text
+CLENQO Organization
+        ↓
+Multi-Branch System
+        ↓
+HQ Administration
+        ↓
+Branch Creation
+        ↓
+Automatic Provisioning
+        ↓
+Branch Website
+        ↓
+Branch Dashboard
+```
+
+Once this foundation is verified, subsequent systems can be implemented on top of it in controlled OpenSpec changes.
