@@ -38,7 +38,19 @@ function getPool(): Pool {
         ).hostname}:5432/postgres`
       : undefined;
 
-  pool = new Pool({ connectionString, max: 10 });
+  // Hosted Supabase (pooler or direct) requires TLS. The pooler presents a
+  // certificate chain that is not always present in local trust stores
+  // ("self-signed certificate in certificate chain"), so encryption is
+  // enforced without CA validation — the pattern in the Supabase docs for
+  // sslmode=require. Verify-full against the Supabase CA is future hardening.
+  const isSupabaseRemote =
+    !!connectionString && /pooler\.supabase\.com|\.supabase\.(co|com)/.test(connectionString);
+
+  pool = new Pool({
+    connectionString,
+    max: 10,
+    ssl: isSupabaseRemote ? { rejectUnauthorized: false } : undefined,
+  });
   return pool;
 }
 
