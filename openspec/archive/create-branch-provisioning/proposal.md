@@ -1,7 +1,7 @@
 # Proposal: Branch Creation with Automatic Provisioning
 
 **Change ID:** `create-branch-provisioning`
-**Status:** Draft (awaiting approval — do not implement)
+**Status:** Archived (completed 2026-09-14 — commit `b76db9b`; hosted Supabase verification 19/19 PASS)
 **Roadmap phase:** Phase 1 — Core Booking Platform (`ROADMAP.md` §6.1–6.2)
 **Priority:** P0 (first functional milestone, `README.md` §13)
 
