@@ -1,7 +1,7 @@
 # Proposal: Service Catalog & Branch Service Configuration
 
 **Change ID:** `create-service-catalog`
-**Status:** Draft (awaiting approval — do not implement)
+**Status:** Archived (completed 2026-09-14 — commit `2cc874a`; hosted Supabase verification 12/12 PASS). Note: task 12.4 (authoring concrete V1 catalog content) remains intentionally pending business approval per decision Q6 — the seed mechanism is structure-only by design.
 **Roadmap phase:** Phase 1 — Core Booking Platform, Services (`ROADMAP.md` §9)
 **Priority:** P1 — required before branch activation can ever succeed (the
 readiness checklist implemented in Change 1 counts `active` services per
