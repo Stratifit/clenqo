@@ -309,6 +309,164 @@ describe("RLS: service catalog (task 3.2)", () => {
   });
 });
 
+describe("RLS: scheduling & availability (migration 0009, Change 3 task 3.2)", () => {
+  // Scheduling fixtures, inserted as harness (privileged client) — the same
+  // way the application's privileged server client writes scheduling data
+  // after application-level authorization.
+  let catSchedA1: string, svcSchedA1: string;
+  let hoursA1: string, hoursB1: string;
+  let excA1: string, excB1: string;
+  let cfgA1: string;
+  let ruleA1: string;
+  let holdA1: string;
+
+  beforeAll(async () => {
+    catSchedA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.service_categories (organization_id, branch_id, slug, name)
+         values ($1, $2, 'rls-sched-cat', 'Sched Cat') returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+    svcSchedA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.services (organization_id, branch_id, category_id, slug, name)
+         values ($1, $2, $3, 'rls-sched-svc-a1', 'Sched Svc A1') returning id`,
+        [orgA, branchA1, catSchedA1],
+      )
+    ).rows[0].id;
+
+    hoursA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.branch_operating_hours
+           (organization_id, branch_id, weekday, interval_index, start_time, end_time, effective_from)
+         values ($1, $2, 1, 0, '08:00', '18:00', '2026-01-01') returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+    hoursB1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.branch_operating_hours
+           (organization_id, branch_id, weekday, interval_index, start_time, end_time, effective_from)
+         values ($1, $2, 1, 0, '09:00', '13:00', '2026-01-01') returning id`,
+        [orgB, branchB1],
+      )
+    ).rows[0].id;
+
+    excA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.branch_schedule_exceptions
+           (organization_id, branch_id, exception_type, start_date, end_date, reason)
+         values ($1, $2, 'closed', '2026-12-24', '2026-12-26', 'Holiday closure') returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+    excB1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.branch_schedule_exceptions
+           (organization_id, branch_id, exception_type, start_date, end_date)
+         values ($1, $2, 'blackout', '2026-12-24', '2026-12-24') returning id`,
+        [orgB, branchB1],
+      )
+    ).rows[0].id;
+
+    cfgA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.branch_scheduling_configuration (organization_id, branch_id)
+         values ($1, $2) returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+
+    ruleA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.service_scheduling_rules (organization_id, branch_id, service_id)
+         values ($1, $2, $3) returning id`,
+        [orgA, branchA1, svcSchedA1],
+      )
+    ).rows[0].id;
+
+    holdA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.slot_holds
+           (organization_id, branch_id, service_id, start_time, end_time, session_id, idempotency_key, expires_at)
+         values ($1, $2, $3, '2027-06-01T08:00Z', '2027-06-01T11:00Z', 'rls-sess-a', 'rls-key-a', '2027-06-01T08:15Z')
+         returning id`,
+        [orgA, branchA1, svcSchedA1],
+      )
+    ).rows[0].id;
+  });
+
+  it("HQ admin reads own organization scheduling rows", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const hours = await t.db.query<{ id: string }>(`select id from public.branch_operating_hours`);
+      expect(hours.rows.map((r) => r.id)).toEqual([hoursA1]);
+      const exc = await t.db.query<{ id: string }>(`select id from public.branch_schedule_exceptions`);
+      expect(exc.rows.map((r) => r.id)).toEqual([excA1]);
+      const cfg = await t.db.query<{ id: string }>(`select id from public.branch_scheduling_configuration`);
+      expect(cfg.rows.map((r) => r.id)).toEqual([cfgA1]);
+      const rules = await t.db.query<{ id: string }>(`select id from public.service_scheduling_rules`);
+      expect(rules.rows.map((r) => r.id)).toEqual([ruleA1]);
+      const holds = await t.db.query<{ id: string }>(`select id from public.slot_holds`);
+      expect(holds.rows.map((r) => r.id)).toEqual([holdA1]);
+    });
+  });
+
+  it("HQ admin cannot read another organization's scheduling rows by known ID", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      for (const [table, id] of [
+        ["branch_operating_hours", hoursB1],
+        ["branch_schedule_exceptions", excB1],
+      ] as const) {
+        const probe = await t.db.query(`select * from public.${table} where id = $1`, [id]);
+        expect(probe.rows).toHaveLength(0);
+      }
+    });
+  });
+
+  it("branch manager reads only the assigned branch's scheduling rows", async () => {
+    const scopedUser = await t.db.query<{ user_id: string }>(
+      `select user_id from public.memberships where id = $1`, [membershipA],
+    );
+    await asAuthenticatedUser(t.db, scopedUser.rows[0].user_id, async () => {
+      const hours = await t.db.query<{ id: string }>(`select id from public.branch_operating_hours`);
+      expect(hours.rows.map((r) => r.id)).toEqual([hoursA1]);
+      const holds = await t.db.query<{ id: string }>(`select id from public.slot_holds`);
+      expect(holds.rows.map((r) => r.id)).toEqual([holdA1]);
+    });
+  });
+
+  it("unauthenticated sees no scheduling rows", async () => {
+    await asAuthenticatedUser(t.db, null, async () => {
+      const hours = await t.db.query(`select id from public.branch_operating_hours`);
+      expect(hours.rows).toHaveLength(0);
+      const holds = await t.db.query(`select id from public.slot_holds`);
+      expect(holds.rows).toHaveLength(0);
+    });
+  });
+
+  it("writes remain denied through the authenticated RLS path", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(
+        t.db.query(
+          `insert into public.branch_operating_hours
+             (organization_id, branch_id, weekday, interval_index, start_time, end_time, effective_from)
+           values ($1, $2, 2, 0, '08:00', '17:00', '2026-02-01')`,
+          [orgA, branchA1],
+        ),
+      ).rejects.toThrow();
+    });
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(
+        t.db.query(`update public.branch_scheduling_configuration set concurrency_cap = 99`),
+      ).rejects.toThrow();
+    });
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(t.db.query(`delete from public.slot_holds`)).rejects.toThrow();
+    });
+  });
+});
+
 describe("RLS: audit immutability", () => {
   it("application role cannot modify or delete audit records", async () => {
     // Insert as harness (privileged) — the app writes via the privileged client.

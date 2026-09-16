@@ -441,6 +441,20 @@ services.edit
 
 The exact list can grow over time.
 
+### Open security decision — scheduling override (2026-09)
+
+`SCHEDULING_SYSTEM.md` §56 describes a constrained override capability for
+authorized users. Per scheduling decision **S17**, this capability is
+**deferred to a later dedicated security decision**: no override permission
+is created by Change 3, and no existing catalog permission is silently
+remapped to grant override power. Until that decision is made, V1 scheduling
+does not implement constraint overrides.
+
+Branch scheduling configuration (operating hours, schedule exceptions,
+scheduling parameters, slot-hold administration) is governed by the existing
+catalog permissions **`branches.view`** / **`branches.edit`** — no new
+permission family is introduced.
+
 ---
 
 # 15. Permission Naming

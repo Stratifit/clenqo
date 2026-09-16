@@ -2461,6 +2461,29 @@ booking_events
 recurring_booking_plans
 ```
 
+### Scheduling (IMPLEMENTED — migration 0009, SCHEDULING_SYSTEM.md §84–86)
+
+```text
+branch_operating_hours            weekly recurring template (branch, weekday, interval index, local start/end, effective_from/until)
+branch_schedule_exceptions        typed: closed | reduced_hours | blackout | holiday_override (branch, date/range, alternate intervals, reason)
+branch_scheduling_configuration   notice, advance window, slot grid, buffers, concurrency cap, customer horizon, hold TTL (per branch)
+service_scheduling_rules          per-service permitted windows/days; scheduling constraints only — MUST NOT become a second pricing/duration authority
+slot_holds                        scheduling-owned temporary reservations (branch, interval, session/idempotency key, expires_at, lifecycle state)
+```
+
+Notes:
+
+* Branch operating hours support multiple intervals per weekday and effective
+  dating; historical schedules are immutable after completion.
+* Branch schedule exceptions override the weekly template; the V1 source is
+  manual branch entry only (decision S9b — no calendar provider).
+* Slot holds are the single temporary capacity-blocking mechanism in V1
+  (decision S1, SCHEDULING_SYSTEM.md §84) and expire by read-time validation
+  plus periodic sweep (default TTL 15 minutes, S1b).
+* The `jobs` entity additionally carries an **estimated-duration snapshot**
+  (minutes, Pricing-derived) so scheduling and capacity math is queryable at
+  the job level.
+
 ### Workforce
 
 ```text
@@ -2540,12 +2563,48 @@ bookings
 booking_items
 booking_events
 
+branch_operating_hours
+branch_schedule_exceptions
+branch_scheduling_configuration
+service_scheduling_rules
+slot_holds
+
 employees
 jobs
 job_assignments
 
 audit_logs
 ```
+
+The scheduling entities above are **implemented** by migration
+`0009_scheduling_availability.sql` (decision record S1–S18,
+`SCHEDULING_SYSTEM.md` §84–86). Field-level facts:
+
+* `branch_operating_hours`: `weekday smallint CHECK 0–6` (0 = Sunday,
+  branch-local), `interval_index >= 0`, `start_time`/`end_time` (local wall
+  clock, no-wrap CHECK per S13), `effective_from`/`effective_until`; UNIQUE
+  `(branch_id, weekday, interval_index, effective_from)`; RLS select via the
+  0006 helpers (HQ org-wide, branch roles via `membership_branches`), no
+  FORCE.
+* `branch_schedule_exceptions`: `exception_type` CHECK
+  (`closed | reduced_hours | blackout | holiday_override`), `start_date` ≤
+  `end_date`, `intervals jsonb` (Zod-validated at the domain layer), `reason`.
+* `branch_scheduling_configuration`: per-branch singleton (UNIQUE
+  `branch_id`) with the approved defaults — notice 1440 min (S4), advance 90 d
+  (S5), grid 15 min (S3), buffers 15/30 min (S6b), cap 3 (S7b), horizon 14 d
+  (S12), hold TTL 15 min (S1b); CHECK grid-divides-hour, cap ≥ 1.
+* `service_scheduling_rules`: `weekday`/`start_time`/`end_time` nullable
+  (NULL = branch window); composite same-branch FK
+  `(service_id, branch_id) → services (id, branch_id)`; UNIQUE
+  `(branch_id, service_id, weekday, start_time)` NULLS NOT DISTINCT; no
+  pricing/duration columns (S6).
+* `slot_holds`: absolute UTC `start_time`/`end_time` (timestamptz),
+  `session_id`, `idempotency_key` (UNIQUE), `status` CHECK
+  (`held | consumed | released | expired`), `expires_at` (CHECK
+  `expires_at > created_at`, DB-clock anchored at creation),
+  `consumed_by_booking`; partial UNIQUE index enforces one ACTIVE hold per
+  session; RLS as above. The single capacity-blocking mechanism (S1,
+  MEDIUM-9 resolution).
 
 Payments, invoices, notifications, reviews, advanced workforce scheduling, and advanced quality systems can follow after the operational foundation is stable.
 

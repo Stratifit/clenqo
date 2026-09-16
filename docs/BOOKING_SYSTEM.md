@@ -396,6 +396,8 @@ depending on the scheduling model.
 
 Where required, the system may temporarily hold a selected slot while the customer completes checkout.
 
+The temporary reservation mechanism is **scheduling-owned**: slot holds are created, validated, expired, and consumed by the scheduling domain (`SCHEDULING_SYSTEM.md` §84, decision S1). Booking drafts do not independently block capacity, and there is no persisted blocking `pending` reservation state in V1.
+
 Conceptually:
 
 ```text

@@ -979,6 +979,13 @@ emergency operational decision
 
 Overrides must require explicit permission and create an audit record.
 
+> **Decision S17 (2026-09):** the override capability is **deferred to a
+> later dedicated security decision**. No scheduling override permission
+> exists in Change 3, and none of the existing catalog permissions is
+> silently remapped to grant override power. V1 scheduling configuration is
+> governed exclusively by the existing `branches.view` / `branches.edit`
+> permissions (see §86).
+
 ---
 
 # 57. Dashboard Scheduling
@@ -1330,11 +1337,9 @@ Initial implementation should support:
 ```text
 branch operating hours
 service availability
-employee availability
-employee exceptions
-service duration
+service duration (via the Pricing Engine interface contract)
 existing jobs
-basic buffers
+buffers (operational + fixed travel)
 time slots
 lead time
 advance booking limit
@@ -1342,7 +1347,28 @@ blackout dates
 server-side availability
 confirmation re-check
 basic manual assignment
+branch concurrency cap (default 3)
+temporary slot holds (single reservation mechanism)
+15-minute slot grid
+24-hour minimum notice
+90-day maximum advance
+14-day customer-facing availability horizon
+15-minute operational buffer
+30-minute fixed travel buffer
+manual schedule exceptions
+deterministic DST handling
 ```
+
+The V1 MVP explicitly EXCLUDES:
+
+```text
+skill-based availability filtering (assignment-time validation only)
+overnight / cross-midnight services
+emergency bookings
+employee/workforce-derived capacity (arrives with the Phase 2 workforce change)
+```
+
+The authoritative V1 decision record is §86 (S1–S18).
 
 ---
 
@@ -1415,3 +1441,238 @@ Each domain should communicate through explicit contracts.
 # 83. Golden Scheduling Rule
 
 > **CLENQO must never promise a cleaning slot that the branch cannot realistically fulfill. Availability must be calculated from authoritative operational constraints, and every booking confirmation must perform a final concurrency-safe validation before committing the schedule.**
+
+---
+
+# 84. V1 Reservation Model (Decision S1)
+
+The V1 reservation mechanism is a **scheduling-owned temporary slot hold**.
+
+Rules:
+
+* Scheduling owns temporary slot holds.
+* A booking draft is non-blocking.
+* There is no persisted blocking `pending` booking state in V1.
+* A hold is created only after a real availability check.
+* A session may have only one active hold.
+* Hold creation is idempotent.
+* Hold lifecycle:
+
+```text
+created → held → consumed / released / expired
+```
+
+* Hold TTL is configurable per branch.
+* Default TTL = 15 minutes.
+* Expiry is enforced by read-time validation plus periodic cleanup/sweep.
+* Booking confirmation must perform a final authoritative availability re-check.
+* Confirmation consumes the valid hold atomically with booking creation.
+* Abandoned checkout creates no booking.
+* Expired/released holds restore capacity.
+* Audit events:
+
+```text
+slot_held
+slot_released
+slot_consumed
+```
+
+> **Resolves audit finding MEDIUM-9** (`docs/DOCUMENTATION_AUDIT.md`): the
+> slot hold is the **SINGLE** temporary capacity-blocking mechanism in V1;
+> a booking draft does not independently block capacity. `BOOKING_SYSTEM.md`
+> §19 and §31–32 describe the customer-facing checkout experience, not a
+> second reservation mechanism.
+
+---
+
+# 85. Scheduling / Assignment Boundary (Decision S15)
+
+> "Scheduling answers whether the requested work can be performed in the requested interval from branch, service, capacity, and conflict constraints — it counts eligible resources but never selects one. Assignment answers which eligible, available worker is chosen to perform it — it may rank and select only among candidates Scheduling has already established as feasible; neither domain performs the other's question."
+
+Scheduling never emits a chosen worker; assignment algorithms consume only
+the feasibility-filtered candidate set Scheduling produces.
+
+---
+
+# 86. V1 Decision Annex — S1–S18
+
+The following decisions were approved 2026-09 (business + technical review)
+and are **normative for Change 3** (`openspec/changes/create-scheduling-availability/`).
+
+### S1 — Reservation / Hold Model
+
+Reservation mechanism = scheduling-owned temporary slot hold. Draft is
+non-blocking. No persisted blocking pending booking. Hold consumed by
+confirmation. One active hold per session. Idempotent. Read-time expiry +
+periodic sweep. Final confirmation re-checks availability transactionally.
+See §84.
+
+### S1b — Hold Duration
+
+Default TTL = **15 minutes**, configurable per branch.
+
+### S2 — Operating Hours Model
+
+Operating hours use a relational weekly template with:
+
+```text
+branch
+weekday
+interval index
+local start/end time
+effective_from
+effective_until
+```
+
+Multiple intervals per day are allowed. Exceptions override the weekly
+template. Historical schedules are immutable after completion.
+
+### S2b — Default Branch Operating Hours
+
+Seed defaults (configurable per branch):
+
+```text
+Monday–Friday:  08:00–18:00
+Saturday:       09:00–14:00
+Sunday:         closed
+```
+
+### S3 / S3b — Slot Grid
+
+Slot grid default = **15 minutes**. Configurable per branch.
+
+### S4 — Minimum Notice
+
+Minimum notice default = **24 hours**. Configurable per branch.
+
+### S5 — Maximum Advance Booking Window
+
+Maximum advance booking window default = **90 days**. Configurable per branch.
+
+### S6 — Buffer Model
+
+Service duration is owned by the Pricing Engine. Scheduling consumes the
+authoritative duration through an interface contract. Operational and travel
+buffers are separate from service duration.
+
+### S6b — Buffer Defaults
+
+```text
+operational buffer = 15 minutes
+travel buffer      = 30 minutes
+```
+
+Both configurable per branch.
+
+### S7 / S7b — V1 Capacity
+
+V1 capacity uses a **branch-level concurrency cap**. Workforce-derived
+capacity is deferred to Phase 2. Default maximum concurrent jobs = **3**,
+configurable per branch.
+
+### S8 — Skills
+
+Skills are **NOT** used for availability calculation in V1. Skills validation
+occurs at assignment time only. No skill-based availability in Change 3.
+
+### S9 / S9b — Holidays and Exceptions
+
+Use a unified typed branch schedule exception model:
+
+```text
+closed
+reduced_hours
+blackout
+holiday_override
+```
+
+V1 uses manual branch exceptions only. No external holiday/calendar provider.
+
+### S10 — Same-Day / Emergency
+
+Same-day ordinary bookings are allowed only when the 24-hour minimum-notice
+rule is satisfied. Emergency bookings are disabled in V1.
+
+### S11 — Recurring
+
+Recurring-plan creation/rules belong to the Booking phase. Change 3 provides
+only the scheduling foundation needed to validate recurring occurrences
+independently. Recurring-plan CRUD is not implemented here. Future occurrence
+validation must never silently create invalid occurrences.
+
+### S12 — Horizons
+
+Maximum advance booking window = **90 days** (S5). Customer-facing
+availability query horizon default = **14 days**. The customer-facing horizon
+is distinct from the internal scheduling horizon; customers may navigate to
+dates within the 90-day booking window even though the default availability
+query returns 14 days.
+
+### S13 — Overnight
+
+No overnight bookings in V1. A booking must complete within one branch-local
+calendar day. The underlying data model should remain wrap-capable for future
+extension.
+
+### S14 — DST Handling
+
+DST handling must be deterministic:
+
+* nonexistent spring-forward recurring local times are rejected in
+  configuration;
+* concrete candidate starts that fall into nonexistent local times are
+  skipped;
+* ambiguous fall-back local times use the earlier/first occurrence;
+* local intervals are materialized into UTC before comparisons.
+
+### S15 — Scheduling vs Assignment
+
+Use the exact §85 boundary sentence.
+
+### S16 — Confirmation Concurrency
+
+Final confirmation sequence:
+
+1. Validate request.
+2. Read effective catalog offering.
+3. Authoritative availability engine re-computation.
+4. Create/validate slot hold.
+5. Execute one transaction that:
+   * performs final availability re-check including holds/bookings/capacity,
+   * consumes the hold,
+   * creates booking + booking items,
+   * creates pricing snapshot,
+   * creates booking event,
+   * creates job,
+   * creates required audit events,
+   * commits atomically.
+6. After commit:
+   * notifications,
+   * outbox processing,
+   * cache invalidation,
+   * other asynchronous side effects.
+
+Use DB-level protection and idempotency to prevent double booking.
+
+### S17 — Configuration Ownership / Permissions
+
+Branch scheduling hours/exceptions/configuration use the existing
+`branches.view` and `branches.edit` permissions. No new scheduling permission
+is introduced in Change 3. Override capability is deferred to a later
+dedicated security decision (see §56).
+
+### S18 — Availability Pipeline
+
+1. Read branch schedule/configuration.
+2. Apply schedule exceptions.
+3. Resolve service offering and applicable service scheduling rules.
+4. Obtain authoritative duration from the Pricing Engine interface contract.
+5. Materialize local intervals into UTC using deterministic DST-safe rules.
+6. Generate candidate starts on the configured grid.
+7. Filter by: minimum notice, maximum advance, customer-facing horizon,
+   occupied intervals, buffers, capacity.
+8. Return customer-safe slots without exposing internal workforce details or
+   performing pricing calculations.
+
+The implementation must not duplicate pricing or duration calculation inside
+Scheduling.

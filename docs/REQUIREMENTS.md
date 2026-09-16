@@ -697,6 +697,17 @@ Scheduling must consider:
 * Service requirements
 * Existing assignments
 
+Scheduling guarantees (normative details in `SCHEDULING_SYSTEM.md` §84–86):
+
+* Availability is calculated server-side and is authoritative; client-side
+  availability data is informational only.
+* Booking confirmation must perform a final concurrency-safe availability
+  re-check before committing.
+* Temporary slot holds are the single V1 temporary reservation mechanism
+  (`SCHEDULING_SYSTEM.md` §84); booking drafts do not block capacity.
+* DST handling must be deterministic (spring-forward nonexistent times
+  rejected/skipped; fall-back ambiguity resolved to the first occurrence).
+
 Future versions may additionally consider:
 
 * Travel time

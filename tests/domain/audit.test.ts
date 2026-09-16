@@ -129,3 +129,83 @@ describe("audit events", () => {
     expect(row.rows[0].metadata.truncated).toBe(true);
   });
 });
+
+describe("scheduling audit trail (Change 3, task 10.2)", () => {
+  it("hold lifecycle events are paired and carry bounded, redacted metadata", async () => {
+    const { seedSchedulingDefaults } = await import("@/features/scheduling/seed");
+    const { createSlotHold, releaseSlotHold } = await import("@/features/scheduling/holds");
+    const { getAvailability } = await import("@/features/scheduling/availability");
+
+    const branchId = await t.fx.createBranch(orgId, "audit-sched");
+    await seedSchedulingDefaults(branchId);
+
+    const cat = (
+      await t.db.query<{ id: string }>(
+        `insert into public.service_categories (organization_id, branch_id, slug, name, is_enabled, status)
+         values ($1, $2, 'audit-cat', 'Cat', true, 'active') returning id`,
+        [orgId, branchId],
+      )
+    ).rows[0].id;
+    const svc = (
+      await t.db.query<{ id: string }>(
+        `insert into public.services (organization_id, branch_id, category_id, slug, name, is_enabled, status)
+         values ($1, $2, $3, 'audit-svc', 'Svc', true, 'active') returning id`,
+        [orgId, branchId, cat],
+      )
+    ).rows[0].id;
+
+    const now = new Date("2027-06-01T09:00:00.000Z");
+    const slots = await getAvailability(
+      { branchId, serviceId: svc, now, days: 3 },
+      { async getEstimatedDuration() { return 60; } },
+    );
+    const target = slots.find((s) => s.available)!;
+
+    const hold = await createSlotHold(
+      ctx,
+      {
+        branch_id: branchId,
+        service_id: svc,
+        start_time: target.start,
+        end_time: target.end,
+        session_id: "audit-sess-1",
+        idempotency_key: "audit-idem-1",
+      },
+      { async getEstimatedDuration() { return 60; } },
+      now,
+    );
+    await releaseSlotHold(ctx, { hold_id: hold.id, session_id: "audit-sess-1" });
+
+    // Paired lifecycle: slot.held and slot.released for the same resource.
+    const events = await t.db.query<{ action: string; metadata: Record<string, unknown> }>(
+      `select action, metadata from public.audit_logs
+       where branch_id = $1 and resource_id = $2 and action in ('slot.held','slot.released')
+       order by created_at asc`,
+      [branchId, hold.id],
+    );
+    expect(events.rows.map((e) => e.action)).toEqual(["slot.held", "slot.released"]);
+    // Bounded, redacted: no secrets, no oversized payloads.
+    const meta = events.rows[0].metadata;
+    expect(JSON.stringify(meta)).not.toMatch(/password|token|secret/i);
+    expect(JSON.stringify(meta).length).toBeLessThan(4096);
+  });
+
+  it("configuration mutations carry actor identity and dotted action names", async () => {
+    const { updateSchedulingConfig } = await import("@/features/scheduling/service");
+    const { seedSchedulingDefaults } = await import("@/features/scheduling/seed");
+    const branchId = await t.fx.createBranch(orgId, "audit-cfg");
+    // The configuration singleton is provisioned by seedSchedulingDefaults;
+    // ensure it exists before the mutation.
+    await seedSchedulingDefaults(branchId);
+    await updateSchedulingConfig(ctx, { branch_id: branchId, concurrency_cap: 4 });
+
+    const row = await t.db.query<{ actor_user_id: string | null; action: string }>(
+      `select actor_user_id, action from public.audit_logs
+       where branch_id = $1 and action = 'scheduling_config.updated'
+       order by created_at desc limit 1`,
+      [branchId],
+    );
+    expect(row.rows[0].action).toBe("scheduling_config.updated");
+    expect(row.rows[0].actor_user_id).toBe(ctx.actor.userId);
+  });
+});

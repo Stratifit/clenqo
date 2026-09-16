@@ -159,7 +159,7 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
   * `pricing_versions` (required by PRICING_ENGINE's versioning model; DATABASE §16.3 stores `pricing_profile_version` on the booking instead — see CRITICAL-2);
   * any magic-link/token table or column (DATABASE §41 and BOOKING_SYSTEM §"Magic Link" describe tokens with expiry/scope/revocation, but no storage representation appears in §64);
-  * `holds` / temporary slot holds (SCHEDULING_SYSTEM §"Temporary Holds" describes a hold record with expiry);
+  * `holds` / temporary slot holds (SCHEDULING_SYSTEM §"Temporary Holds" describes a hold record with expiry) — **RESOLVED (2026-09, implemented):** the scheduling table set appears in DATABASE §64/§65 and is created by migration `0009_scheduling_availability.sql` (`branch_operating_hours`, `branch_schedule_exceptions`, `branch_scheduling_configuration`, `service_scheduling_rules`, `slot_holds`);
   * `payment_attempts`/webhook events (PAYMENT_SYSTEM describes provider events, idempotency, and retries; only `payments` and `refunds` are listed);
   * `notification_outbox` or equivalent (NOTIFICATION_SYSTEM §"Outbox" and BACKGROUND_JOBS §11 require an outbox/job record; BACKGROUND_JOBS §6 defines the job record fields, but no table name appears in DATABASE);
   * `quality_checks`/`quality_issues` are listed in §64 under Quality but flagged "possible future tables" in §37 — acceptable, but the mixed signals should be cleaned up together with the above.
@@ -340,6 +340,17 @@ The problems are concentrated in **cross-document detail drift** that was introd
 * **Why it matters:** Double reservation logic causes subtle availability bugs and ghost slots.
 
 * **Recommended resolution:** Add one paragraph to BOOKING_SYSTEM §32: whether `pending` bookings place a hold, and that holds expire independently of booking drafts.
+
+> **RESOLVED (2026-09, by decision — implemented and hosted-verified in Change 3):** the approved
+> scheduling decision record resolves this in favor of a single mechanism:
+> scheduling-owned temporary slot holds are the only capacity-blocking
+> reservation in V1; booking drafts do not block; no persisted blocking
+> `pending` state exists. Normative text: `SCHEDULING_SYSTEM.md` §84
+> (decision S1). Implemented by migration `0009_scheduling_availability.sql`
+> and `features/scheduling/` (hold lifecycle: idempotent creation, one active
+> hold per session, DB-clock TTL, read-time expiry + sweep, atomic
+> consumption); hosted verification passed (Change 3 task 13:
+> 12/12 scheduling tests, 43/43 full hosted suite).
 
 ## MEDIUM-10 — README/docs filename drift and dead references
 

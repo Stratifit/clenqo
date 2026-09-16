@@ -51,7 +51,20 @@ export async function evaluateReadiness(branch: BranchRecord): Promise<Readiness
     note: "pricing domain ships in a later Phase-1 change",
   });
 
-  items.push({ requirement: "operating_hours", satisfied: false, note: "hours domain ships later" });
+  // Operating hours now have a real data model (Change 3, S2): at least one
+  // effective-dated weekly interval must exist for the branch.
+  const hours = await query<{ count: string }>(
+    `select count(*)::text as count
+     from public.branch_operating_hours
+     where branch_id = $1
+       and effective_from <= current_date
+       and (effective_until is null or effective_until >= current_date)`,
+    [branch.id],
+  ).catch(() => ({ rows: [{ count: "0" }], rowCount: 1 }));
+  items.push({
+    requirement: "operating_hours",
+    satisfied: Number(hours.rows[0]?.count ?? 0) > 0,
+  });
   items.push({ requirement: "service_area", satisfied: Boolean(branch.service_area) });
   items.push({ requirement: "manager", satisfied: await hasAssignedManager(branch), note: "assign via membership_branches" });
   items.push({ requirement: "notification_configuration", satisfied: false, note: "notifications domain ships later" });

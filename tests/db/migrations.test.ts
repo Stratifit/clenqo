@@ -373,7 +373,7 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
     });
   });
 
-  it("keeps the migration chain file sequence intact (0001–0008)", async () => {
+  it("keeps the migration chain file sequence intact (0001–0009)", async () => {
     const { readdir } = await import("node:fs/promises");
     const files = (await readdir("supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
     expect(files).toEqual([
@@ -385,6 +385,226 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
       "0006_authorization_helpers.sql",
       "0007_rls_policies.sql",
       "0008_service_catalog.sql",
+      "0009_scheduling_availability.sql",
     ]);
+  });
+});
+
+describe("scheduling schema (migration 0009, Change 3 task 2.3)", () => {
+  it("creates all five scheduling tables", async () => {
+    await withFreshDb(async (db) => {
+      const res = await db.query<{ table_name: string }>(
+        `select table_name from information_schema.tables
+          where table_schema = 'public' and table_name in
+          ('branch_operating_hours', 'branch_schedule_exceptions',
+           'branch_scheduling_configuration', 'service_scheduling_rules', 'slot_holds')
+          order by table_name`,
+      );
+      expect(res.rows.map((r) => r.table_name)).toEqual([
+        "branch_operating_hours",
+        "branch_schedule_exceptions",
+        "branch_scheduling_configuration",
+        "service_scheduling_rules",
+        "slot_holds",
+      ]);
+    });
+  });
+
+  it("enforces branch_id NOT NULL and organization scope on every scheduling table (Q9)", async () => {
+    await withFreshDb(async (db) => {
+      const res = await db.query<{ table_name: string; is_nullable: string }>(
+        `select c.table_name, c.is_nullable from information_schema.columns c
+          where c.table_schema = 'public'
+            and c.table_name in ('branch_operating_hours', 'branch_schedule_exceptions',
+                                 'branch_scheduling_configuration', 'service_scheduling_rules', 'slot_holds')
+            and c.column_name = 'branch_id'
+          order by c.table_name`,
+      );
+      expect(res.rows).toHaveLength(5);
+      expect(res.rows.every((r) => r.is_nullable === "NO")).toBe(true);
+    });
+  });
+
+  it("enforces the S13 no-wrap rule on operating hours and service rules", async () => {
+    await withFreshDb(async (db) => {
+      const org = (await db.query<{ id: string }>(
+        `insert into public.organizations (name, slug) values ('O', 'sched-o') returning id`,
+      )).rows[0].id;
+      const branch = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'B', 'sched-berlin', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [org],
+      )).rows[0].id;
+
+      // Overnight interval rejected (S13).
+      await expect(
+        db.query(
+          `insert into public.branch_operating_hours
+             (organization_id, branch_id, weekday, interval_index, start_time, end_time, effective_from)
+           values ($1, $2, 1, 0, '20:00', '02:00', '2026-01-01')`,
+          [org, branch],
+        ),
+      ).rejects.toThrow(/ck_branch_hours_no_wrap/);
+
+      // Zero-length interval rejected too.
+      await expect(
+        db.query(
+          `insert into public.branch_operating_hours
+             (organization_id, branch_id, weekday, interval_index, start_time, end_time, effective_from)
+           values ($1, $2, 1, 0, '08:00', '08:00', '2026-01-01')`,
+          [org, branch],
+        ),
+      ).rejects.toThrow(/ck_branch_hours_no_wrap/);
+    });
+  });
+
+  it("enforces the S3 grid divisibility and approved config defaults", async () => {
+    await withFreshDb(async (db) => {
+      const org = (await db.query<{ id: string }>(
+        `insert into public.organizations (name, slug) values ('O2', 'sched-o2') returning id`,
+      )).rows[0].id;
+      const branch = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'B', 'sched-hamburg', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [org],
+      )).rows[0].id;
+
+      // Defaults = approved S4/S5/S3/S6b/S7b/S12/S1b values.
+      const cfg = (await db.query<Record<string, number>>(
+        `insert into public.branch_scheduling_configuration (organization_id, branch_id)
+         values ($1, $2) returning *`,
+        [org, branch],
+      )).rows[0];
+      expect(cfg.minimum_notice_minutes).toBe(1440);
+      expect(cfg.maximum_advance_days).toBe(90);
+      expect(cfg.slot_grid_minutes).toBe(15);
+      expect(cfg.operational_buffer_minutes).toBe(15);
+      expect(cfg.travel_buffer_minutes).toBe(30);
+      expect(cfg.concurrency_cap).toBe(3);
+      expect(cfg.customer_horizon_days).toBe(14);
+      expect(cfg.hold_ttl_minutes).toBe(15);
+
+      // Grid must divide the hour (S3 determinism) — a fresh branch avoids the
+      // default-configuration unique collision.
+      const branch2 = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'B2', 'sched-kiel', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [org],
+      )).rows[0].id;
+      await expect(
+        db.query(
+          `insert into public.branch_scheduling_configuration
+             (organization_id, branch_id, slot_grid_minutes)
+           values ($1, $2, 25)`,
+          [org, branch2],
+        ),
+      ).rejects.toThrow(/ck_config_grid_divides_hour/);
+
+      // Cap must be >= 1 (S7).
+      await expect(
+        db.query(
+          `insert into public.branch_scheduling_configuration
+             (organization_id, branch_id, concurrency_cap)
+           values ($1, $2, 0)`,
+          [org, branch2],
+        ),
+      ).rejects.toThrow(/ck_config_cap_positive/);
+    });
+  });
+
+  it("enforces hold status CHECK, expiry shape, and one-active-hold-per-session (S1)", async () => {
+    await withFreshDb(async (db) => {
+      const org = (await db.query<{ id: string }>(
+        `insert into public.organizations (name, slug) values ('O3', 'sched-o3') returning id`,
+      )).rows[0].id;
+      const branch = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'B', 'sched-dresden', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [org],
+      )).rows[0].id;
+      const svc = (await db.query<{ id: string }>(
+        `insert into public.service_categories (organization_id, branch_id, slug, name)
+         values ($1, $2, 'cat', 'Cat') returning id`,
+        [org, branch],
+      )).rows[0].id;
+      const service = (await db.query<{ id: string }>(
+        `insert into public.services (organization_id, branch_id, category_id, slug, name)
+         values ($1, $2, $3, 'svc', 'Svc') returning id`,
+        [org, branch, svc],
+      )).rows[0].id;
+
+      const mkHold = (session: string, key: string) =>
+        db.query(
+          `insert into public.slot_holds
+             (organization_id, branch_id, service_id, start_time, end_time, session_id, idempotency_key, expires_at)
+           values ($1, $2, $3, '2027-06-01T08:00Z', '2027-06-01T11:00Z', $4, $5, '2027-06-01T08:15Z')`,
+          [org, branch, service, session, key],
+        );
+
+      await mkHold("sess-1", "key-1");
+
+      // S1: second ACTIVE hold for the same session rejected by the partial
+      // unique index.
+      await expect(mkHold("sess-1", "key-2")).rejects.toThrow(/uq_slot_holds_one_active_per_session/);
+
+      // Idempotency key uniqueness.
+      await expect(mkHold("sess-2", "key-1")).rejects.toThrow(/uq_slot_holds_idempotency/);
+
+      // A different session may hold concurrently (holds are carts, S1).
+      await expect(mkHold("sess-2", "key-3")).resolves.toBeTruthy();
+
+      // After the first hold is consumed, its session may hold again.
+      await db.query(
+        `update public.slot_holds set status = 'consumed' where session_id = 'sess-1' and idempotency_key = 'key-1'`,
+      );
+      await expect(mkHold("sess-1", "key-4")).resolves.toBeTruthy();
+
+      // Invalid status rejected by the CHECK.
+      await expect(
+        db.query(
+          `insert into public.slot_holds
+             (organization_id, branch_id, service_id, start_time, end_time, session_id, idempotency_key, expires_at, status)
+           values ($1, $2, $3, '2027-06-02T08:00Z', '2027-06-02T11:00Z', 'sess-9', 'key-9', '2027-06-02T08:15Z', 'frozen')`,
+          [org, branch, service],
+        ),
+      ).rejects.toThrow(/slot_holds_status_check/);
+    });
+  });
+
+  it("rejects service scheduling rules referencing another branch's service (same-branch FK)", async () => {
+    await withFreshDb(async (db) => {
+      const orgA = (await db.query<{ id: string }>(
+        `insert into public.organizations (name, slug) values ('OA', 'sched-oa') returning id`,
+      )).rows[0].id;
+      const branchA = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'BA', 'sched-a', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [orgA],
+      )).rows[0].id;
+      const branchB = (await db.query<{ id: string }>(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'BB', 'sched-b', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+        [orgA],
+      )).rows[0].id;
+      const cat = (await db.query<{ id: string }>(
+        `insert into public.service_categories (organization_id, branch_id, slug, name)
+         values ($1, $2, 'cat-a', 'Cat') returning id`,
+        [orgA, branchA],
+      )).rows[0].id;
+      const svcA = (await db.query<{ id: string }>(
+        `insert into public.services (organization_id, branch_id, category_id, slug, name)
+         values ($1, $2, $3, 'svc-a', 'Svc') returning id`,
+        [orgA, branchA, cat],
+      )).rows[0].id;
+
+      // branchB's rule cannot reference branchA's service (composite FK).
+      await expect(
+        db.query(
+          `insert into public.service_scheduling_rules (organization_id, branch_id, service_id)
+           values ($1, $2, $3)`,
+          [orgA, branchB, svcA],
+        ),
+      ).rejects.toThrow(/fk_service_rules_service_same_branch/);
+    });
   });
 });
