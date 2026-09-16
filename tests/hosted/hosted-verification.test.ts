@@ -609,16 +609,22 @@ describe.skipIf(!HOSTED)("hosted verification: create-branch-provisioning", () =
     expect(counts2.translations).toBe(counts1.translations);
     expect(counts2.sections).toBe(counts1.sections);
 
+    // First three events commit in distinct transactions (original Tx1, Tx3,
+    // retry Tx1) so created_at orders them deterministically. The five Tx2
+    // retry audits share one transaction timestamp (design §4), so their
+    // relative order is not observable — asserted as an unordered group.
     const actions = (await auditActions(branch2())).map((a) => a.action);
-    expect(actions).toEqual([
+    expect(actions.slice(0, 3)).toEqual([
       "branch.created",
       "provisioning.failed",
       "provisioning.retry_started",
-      "website.provisioned",
+    ]);
+    expect(actions.slice(3).sort()).toEqual([
+      "branch.ready",
+      "configuration.provisioned",
       "locales.provisioned",
       "pages.provisioned",
-      "configuration.provisioned",
-      "branch.ready",
+      "website.provisioned",
     ]);
   }, 90_000);
 
@@ -678,13 +684,16 @@ describe.skipIf(!HOSTED)("hosted verification: create-branch-provisioning", () =
 
   it("J: audit events carry correct org/branch/request correlation and bounded metadata", async () => {
     const rows = await auditActions(branch1());
-    expect(rows.map((r) => r.action)).toEqual([
-      "branch.created",
-      "website.provisioned",
+    // branch.created (Tx1) precedes the five Tx2 audits; within Tx2 the
+    // events share one transaction timestamp, so order inside the group is
+    // not observable — asserted as an unordered group.
+    expect(rows[0].action).toBe("branch.created");
+    expect(rows.slice(1).map((r) => r.action).sort()).toEqual([
+      "branch.ready",
+      "configuration.provisioned",
       "locales.provisioned",
       "pages.provisioned",
-      "configuration.provisioned",
-      "branch.ready",
+      "website.provisioned",
     ]);
     for (const r of rows) {
       expect(r.organization_id).toBe(S.orgA);

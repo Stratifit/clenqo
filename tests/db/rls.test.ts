@@ -116,6 +116,199 @@ describe("RLS: website tables follow branch scope", () => {
   });
 });
 
+describe("RLS: service catalog (task 3.2)", () => {
+  // Catalog fixture rows, inserted as harness (privileged client) — the same
+  // way the application's privileged server client writes catalog data after
+  // application-level authorization.
+  let catA1: string, svcA1: string, svcA2: string, addonA1: string, compatA1: string;
+  let catB1: string, svcB1: string;
+
+  beforeAll(async () => {
+    const cat = async (org: string, branch: string, slug: string): Promise<string> =>
+      (
+        await t.db.query<{ id: string }>(
+          `insert into public.service_categories (organization_id, branch_id, slug, name)
+           values ($1, $2, $3, $4) returning id`,
+          [org, branch, slug, `Cat ${slug}`],
+        )
+      ).rows[0].id;
+    const svc = async (org: string, branch: string, category: string, slug: string): Promise<string> =>
+      (
+        await t.db.query<{ id: string }>(
+          `insert into public.services (organization_id, branch_id, category_id, slug, name)
+           values ($1, $2, $3, $4, $5) returning id`,
+          [org, branch, category, slug, `Svc ${slug}`],
+        )
+      ).rows[0].id;
+
+    catA1 = await cat(orgA, branchA1, "rls-cat-a1");
+    svcA1 = await svc(orgA, branchA1, catA1, "rls-svc-a1");
+    svcA2 = await svc(orgA, branchA2, catA1, "rls-svc-a2"); // same org, other branch
+    catB1 = await cat(orgB, branchB1, "rls-cat-b1");
+    svcB1 = await svc(orgB, branchB1, catB1, "rls-svc-b1");
+
+    addonA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.service_addons (organization_id, branch_id, slug, name)
+         values ($1, $2, 'rls-addon-a1', 'Addon A1') returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+    compatA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.service_addon_compatibility
+           (organization_id, branch_id, service_addon_id, service_id)
+         values ($1, $2, $3, $4) returning id`,
+        [orgA, branchA1, addonA1, svcA1],
+      )
+    ).rows[0].id;
+
+    // Translation + alias on the branchA1 service.
+    await t.db.query(
+      `insert into public.service_translations (service_id, locale, name)
+       values ($1, 'de', 'RLS Service DE')`,
+      [svcA1],
+    );
+    await t.db.query(
+      `insert into public.service_slug_aliases
+         (organization_id, branch_id, entity_type, entity_id, old_slug)
+       values ($1, $2, 'service', $3, 'rls-old-slug')`,
+      [orgA, branchA1, svcA1],
+    );
+  });
+
+  it("HQ admin reads own organization catalog", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const res = await t.db.query<{ id: string }>(`select id from public.services`);
+      expect(res.rows.map((r) => r.id).sort()).toEqual([svcA1, svcA2].sort());
+    });
+  });
+
+  it("HQ admin cannot read another organization's catalog by known ID", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const probe = await t.db.query(`select * from public.services where id = $1`, [svcB1]);
+      expect(probe.rows).toHaveLength(0);
+      const catProbe = await t.db.query(`select * from public.service_categories where id = $1`, [catB1]);
+      expect(catProbe.rows).toHaveLength(0);
+    });
+  });
+
+  it("branch manager reads only the assigned branch's catalog rows", async () => {
+    const scopedUser = await t.db.query<{ user_id: string }>(
+      `select user_id from public.memberships where id = $1`, [membershipA],
+    );
+    const uid = scopedUser.rows[0].user_id;
+    await asAuthenticatedUser(t.db, uid, async () => {
+      const res = await t.db.query<{ id: string }>(`select id from public.services`);
+      expect(res.rows.map((r) => r.id)).toEqual([svcA1]); // branchA2's row invisible
+    });
+  });
+
+  it("branch manager cannot read another branch by manipulating the id", async () => {
+    const scopedUser = await t.db.query<{ user_id: string }>(
+      `select user_id from public.memberships where id = $1`, [membershipA],
+    );
+    const uid = scopedUser.rows[0].user_id;
+    await asAuthenticatedUser(t.db, uid, async () => {
+      const probe = await t.db.query(`select * from public.services where id = $1`, [svcA2]);
+      expect(probe.rows).toHaveLength(0);
+    });
+  });
+
+  it("cleaner cannot read catalog: no HQ role, no branch scope, no other-org access", async () => {
+    // Catalog visibility requires HQ role or explicit branch scope. A cleaner
+    // has neither, so RLS hides every catalog row — including their own org's
+    // (application-layer services.view gates reads on top of this).
+    const cleanerB = await t.fx.createUser("rls-cleaner@b.test");
+    await t.fx.createMembership(cleanerB, orgB, "cleaner");
+    await asAuthenticatedUser(t.db, cleanerB, async () => {
+      const probe = await t.db.query(`select * from public.services where id = $1`, [svcA1]);
+      expect(probe.rows).toHaveLength(0); // other-org probe invisible
+      const own = await t.db.query<{ id: string }>(`select id from public.services`);
+      expect(own.rows).toHaveLength(0); // even own-org rows: no branch scope
+    });
+
+    // With an explicit branch grant, the RLS model permits branch-scoped
+    // visibility; the application permission layer remains the first gate.
+    const cleanerMembership = await t.db.query<{ id: string }>(
+      `select id from public.memberships where user_id = $1`, [cleanerB],
+    );
+    await t.fx.grantBranch(cleanerMembership.rows[0].id, branchB1);
+    await asAuthenticatedUser(t.db, cleanerB, async () => {
+      const own = await t.db.query<{ id: string }>(`select id from public.services`);
+      expect(own.rows.map((r) => r.id)).toEqual([svcB1]);
+    });
+  });
+
+  it("anonymous sees no catalog rows", async () => {
+    await asAuthenticatedUser(t.db, null, async () => {
+      const res = await t.db.query(`select id from public.services`);
+      expect(res.rows).toHaveLength(0);
+      const cats = await t.db.query(`select id from public.service_categories`);
+      expect(cats.rows).toHaveLength(0);
+    });
+  });
+
+  it("translation tables inherit the parent entity's scope", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const res = await t.db.query<{ service_id: string }>(
+        `select service_id from public.service_translations`,
+      );
+      expect(res.rows.map((r) => r.service_id)).toEqual([svcA1]);
+    });
+    await asAuthenticatedUser(t.db, mgrB, async () => {
+      const res = await t.db.query(`select service_id from public.service_translations`);
+      expect(res.rows).toHaveLength(0);
+    });
+  });
+
+  it("compatibility rows cannot leak across branches", async () => {
+    const scopedUser = await t.db.query<{ user_id: string }>(
+      `select user_id from public.memberships where id = $1`, [membershipA],
+    );
+    const uid = scopedUser.rows[0].user_id;
+    await asAuthenticatedUser(t.db, uid, async () => {
+      const res = await t.db.query<{ id: string }>(
+        `select id from public.service_addon_compatibility`,
+      );
+      expect(res.rows.map((r) => r.id)).toEqual([compatA1]);
+    });
+    await asAuthenticatedUser(t.db, mgrB, async () => {
+      const res = await t.db.query(`select id from public.service_addon_compatibility`);
+      expect(res.rows).toHaveLength(0);
+    });
+  });
+
+  it("slug aliases are scoped to the owning organization and branch", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const res = await t.db.query<{ old_slug: string }>(
+        `select old_slug from public.service_slug_aliases`,
+      );
+      expect(res.rows.map((r) => r.old_slug)).toEqual(["rls-old-slug"]);
+    });
+    await asAuthenticatedUser(t.db, mgrB, async () => {
+      const res = await t.db.query(`select old_slug from public.service_slug_aliases`);
+      expect(res.rows).toHaveLength(0);
+    });
+  });
+
+  it("writes remain denied through the authenticated RLS path", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(
+        t.db.query(
+          `insert into public.service_categories (organization_id, branch_id, slug, name)
+           values ($1, $2, 'rls-hijack', 'Hijack')`,
+          [orgA, branchA1],
+        ),
+      ).rejects.toThrow();
+      await expect(
+        t.db.query(`update public.services set status = 'archived'`),
+      ).rejects.toThrow();
+      await expect(t.db.query(`delete from public.services`)).rejects.toThrow();
+    });
+  });
+});
+
 describe("RLS: audit immutability", () => {
   it("application role cannot modify or delete audit records", async () => {
     // Insert as harness (privileged) — the app writes via the privileged client.

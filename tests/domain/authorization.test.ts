@@ -93,3 +93,123 @@ describe("audit of authorization failure", () => {
     expect(rows.rows).toHaveLength(0);
   });
 });
+
+// -------------------------------------------------------------------------
+// Service catalog authorization (task 4.2; spec "Authorization uses the
+// existing permission catalog"). Permission vocabulary stays services.view /
+// services.edit (Q8); the ROLE decides whether a services.edit holder may
+// perform definition-level mutations.
+// -------------------------------------------------------------------------
+
+describe("catalog authorization matrix", () => {
+  let branchId: string;
+
+  beforeAll(async () => {
+    const { branch } = await createAndProvision(adminA, {
+      ...VALID_BRANCH_INPUT, slug: "auth-catalog",
+    });
+    branchId = branch.id;
+    // managerA gets an explicit branch grant for the offering-flag path.
+    await t.fx.grantBranch(
+      (await t.db.query<{ id: string }>(
+        `select id from public.memberships where user_id = $1 and organization_id = $2`,
+        [managerA.actor.userId, orgA],
+      )).rows[0].id,
+      branchId,
+    );
+  });
+
+  it("HQ Admin can create catalog entities", async () => {
+    const { createCategory } = await import("@/features/services/service");
+    const cat = await createCategory(adminA, {
+      branchId, slug: "auth-cat", name: "Auth Cat",
+      translations: [{ locale: "de", name: "Auth Kategorie" }],
+    });
+    expect(cat.status).toBe("draft");
+  });
+
+  it("HQ Staff (services.edit holder) can create catalog entities", async () => {
+    const { createCategory } = await import("@/features/services/service");
+    const cat = await createCategory(staffA, {
+      branchId, slug: "auth-staff-cat", name: "Staff Cat",
+      translations: [{ locale: "de", name: "Staff Kategorie" }],
+    });
+    expect(cat.status).toBe("draft");
+  });
+
+  it("Branch Manager (services.edit holder) is denied definition-level mutations", async () => {
+    const { createCategory, changeStatus } = await import("@/features/services/service");
+    await expect(
+      createCategory(managerA, {
+        branchId, slug: "auth-mgr-cat", name: "Mgr Cat",
+        translations: [{ locale: "de", name: "Mgr Kategorie" }],
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+
+    const cat = await t.db.query<{ id: string }>(
+      `select id from public.service_categories where slug = 'auth-cat'`,
+    );
+    await expect(
+      changeStatus(managerA, {
+        branchId, entityType: "service_category", entityId: cat.rows[0].id, status: "active",
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+  });
+
+  it("Branch Manager can set offering flags on their own branch", async () => {
+    const { setOfferingState } = await import("@/features/services/service");
+    const cat = await t.db.query<{ id: string }>(
+      `select id from public.service_categories where slug = 'auth-cat'`,
+    );
+    const updated = await setOfferingState(managerA, {
+      branchId, entityType: "service_category", entityId: cat.rows[0].id, is_enabled: true,
+    });
+    expect(updated.is_enabled).toBe(true);
+  });
+
+  it("Cleaner is denied (no services.* permissions)", async () => {
+    const { createCategory } = await import("@/features/services/service");
+    await expect(
+      createCategory(managerA, {
+        branchId, slug: "never", name: "Never",
+        translations: [{ locale: "de", name: "Never" }],
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+
+    const cleanerUser = await t.fx.createUser("cleaner-a@test");
+    await t.fx.createMembership(cleanerUser, orgA, "cleaner");
+    const cleanerCtx = await resolveActor(cleanerUser);
+    const cat = await t.db.query<{ id: string }>(
+      `select id from public.service_categories where slug = 'auth-cat'`,
+    );
+    await expect(
+      (async () => {
+        const { setOfferingState } = await import("@/features/services/service");
+        return setOfferingState(cleanerCtx, {
+          branchId, entityType: "service_category", entityId: cat.rows[0].id, is_enabled: false,
+        });
+      })(),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+  });
+
+  it("cross-organization admin is denied before any state change", async () => {
+    const { updateCategory, setOfferingState } = await import("@/features/services/service");
+    const cat = await t.db.query<{ id: string }>(
+      `select id from public.service_categories where slug = 'auth-cat'`,
+    );
+    await expect(
+      updateCategory(adminB, { branchId, categoryId: cat.rows[0].id, name: "Hijack" }),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+    await expect(
+      setOfferingState(adminB, {
+        branchId, entityType: "service_category", entityId: cat.rows[0].id, is_enabled: true,
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+    const unchanged = await t.db.query<{ name: string; is_enabled: boolean }>(
+      `select name, is_enabled from public.service_categories where id = $1`,
+      [cat.rows[0].id],
+    );
+    expect(unchanged.rows[0].name).toBe("Auth Cat");
+    expect(unchanged.rows[0].is_enabled).toBe(true); // managerA's earlier grant, not adminB's
+  });
+});

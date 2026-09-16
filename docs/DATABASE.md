@@ -626,42 +626,74 @@ Database records provide:
 
 # 15. Services Model
 
+> **Aligned with `docs/SERVICE_CATALOG.md` (decisions Q1–Q9) and migration
+> `0008_service_catalog.sql`.** Category is a first-class entity (Q4), the
+> catalog carries no pricing data (Q5 — pricing belongs to the Pricing
+> Engine, §16), and every catalog row is branch-owned with `branch_id
+> NOT NULL` (Q9 — the earlier "nullable platform defaults" allowance is
+> NOT used). Compatibility is an explicit allow-list (Q3); published slugs
+> freeze and renames create audited aliases (Q7).
+
+## 15.0 `service_categories`
+
+First-class category entity (Q4). Not a `service_type` value on `services`.
+
+Fields (as implemented):
+
+```text
+id                  uuid pk
+organization_id     uuid fk organizations
+branch_id           uuid fk branches, NOT NULL (Q9)
+slug                text, unique (branch_id, slug)
+name                text (default-locale operational name)
+description         text
+status              draft | active | inactive | archived (CHECK)
+sort_order          integer
+is_enabled          boolean, default false (Q2 branch offering flag)
+is_customer_visible boolean, default false (Q2)
+published_at        timestamptz (set on first activation; freezes the slug)
+created_at          timestamptz
+updated_at          timestamptz
+```
+
+Indexes: `(branch_id)`, `(status)`. RLS: organization-wide for HQ roles,
+branch-scoped via `membership_branches` for branch roles (0006 helpers,
+0007 pattern, no FORCE).
+
 ## 15.1 `services`
 
 Represents services available on the platform.
 
-Scope model (clarified per audit MEDIUM-3): for the MVP, services are
-per-branch rows (`services.branch_id` is the branch the service belongs to,
-nullable only for organization-wide platform defaults). A global catalog
-with a separate branch-availability join table is a future evolution and
-must not be assumed by initial migrations.
+Scope model (Q1/Q9): every service is a per-branch row with an explicit
+`branch_id NOT NULL`. A global master catalog with a branch-availability
+join table is a future separate change and must not be assumed.
 
-Suggested fields:
-
-```text
-id
-organization_id
-branch_id
-name
-slug
-service_type
-description
-status
-sort_order
-created_at
-updated_at
-```
-
-A service may be:
+Fields (as implemented; `service_type` is superseded by the `category_id`
+FK to `service_categories` — Q4):
 
 ```text
-home_cleaning
-commercial_cleaning
-deep_cleaning
-move_in_out
+id                  uuid pk
+organization_id     uuid fk organizations
+branch_id           uuid fk branches, NOT NULL (Q9)
+category_id         uuid fk service_categories, NOT NULL (Q4)
+name                text
+slug                text, unique (branch_id, slug)
+description         text
+status              draft | active | inactive | archived (CHECK)
+sort_order          integer
+is_enabled          boolean, default false (Q2)
+is_customer_visible boolean, default false (Q2)
+published_at        timestamptz
+created_at          timestamptz
+updated_at          timestamptz
 ```
 
-The model must allow future service types.
+A service belongs to exactly one category. The former `service_type`
+enumeration (`home_cleaning`, `commercial_cleaning`, `deep_cleaning`,
+`move_in_out`) is a content concern of the category tree, not a schema
+enum; new categories are rows, not code.
+
+Indexes: `(branch_id)`, `(status)`, `(category_id)`.
 
 ---
 
@@ -733,22 +765,89 @@ Extra bathroom
 Pet hair treatment
 ```
 
-Suggested fields:
+Fields (as implemented). **No pricing fields** (Q5): the former
+`pricing_type` / `default_price` columns are removed from the catalog
+model — pricing responsibility belongs exclusively to the Pricing Engine
+(§16), which references stable add-on identities.
 
 ```text
-id
-branch_id
-name
-slug
-description
-pricing_type
-default_price
-status
-created_at
-updated_at
+id                  uuid pk
+organization_id     uuid fk organizations
+branch_id           uuid fk branches, NOT NULL (Q9)
+name                text
+slug                text, unique (branch_id, slug)
+description         text
+status              draft | active | inactive | archived (CHECK)
+sort_order          integer
+min_quantity        integer, default 1, CHECK min_quantity >= 1
+max_quantity        integer, default 1, CHECK max_quantity >= min_quantity
+is_enabled          boolean, default false (Q2)
+is_customer_visible boolean, default false (Q2)
+published_at        timestamptz
+created_at          timestamptz
+updated_at          timestamptz
 ```
 
-Branch-level ownership allows different branches to enable different add-ons.
+Indexes: `(branch_id)`, `(status)`.
+
+### 15.5 Translation tables (per `DATABASE.md` §42 pattern)
+
+```text
+service_category_translations (category_id, locale, name, description) — unique (category_id, locale)
+service_translations           (service_id,  locale, name, description) — unique (service_id, locale)
+service_variant_translations   (variant_id,  locale, name, description) — unique (variant_id, locale)
+service_addon_translations     (addon_id,    locale, name, description) — unique (addon_id, locale)
+```
+
+Locale membership is validated in the domain layer against the platform
+locale list; new locales are rows, not schema changes. The branch default
+locale is the fallback for missing translations — never an empty string.
+
+### 15.6 `service_addon_compatibility` (Q3)
+
+Explicit allow-list join table. **Absence of a row means incompatible** —
+there is no block-list, no JSONB rule blob, and no code constants.
+
+```text
+id                  uuid pk
+organization_id     uuid fk organizations
+branch_id           uuid fk branches, NOT NULL
+service_addon_id    uuid fk service_addons, NOT NULL
+service_id          uuid fk services, NOT NULL
+service_variant_id  uuid fk service_variants, NULL (NULL = all variants)
+created_at / updated_at
+```
+
+Constraints:
+
+* `unique nulls not distinct (service_addon_id, service_id, service_variant_id)`
+  — one row per pair, including the NULL-variant case.
+* Composite same-branch foreign keys
+  `(service_addon_id, branch_id)`, `(service_id, branch_id)`,
+  `(service_variant_id, branch_id)` ensure all participants belong to the
+  same branch — the join cannot cross branch boundaries.
+
+Indexes: `(service_addon_id)`, `(service_id)`, `(branch_id)`.
+
+### 15.7 `service_slug_aliases` (Q7)
+
+Audited redirect history for published slugs. Append-only: aliases are
+never rewritten. Created only by the audited rename operation
+(`service_slug_alias.created`).
+
+```text
+id               uuid pk
+organization_id  uuid fk organizations
+branch_id        uuid fk branches, NOT NULL
+entity_type      service | service_variant | service_addon (CHECK)
+entity_id        uuid (polymorphic — integrity enforced in the rename transaction)
+old_slug         text
+created_at       timestamptz
+```
+
+`unique (branch_id, entity_type, old_slug)` prevents alias chains and
+reuse of an old slug by a different entity of the same type. Resolution
+goes through the read model (`resolveCatalogSlug`), never raw table scans.
 
 ---
 
@@ -2326,10 +2425,16 @@ media_assets
 ### Services
 
 ```text
+service_categories
 services
 service_translations
 service_variants
+service_variant_translations
 service_addons
+service_addon_translations
+service_category_translations
+service_addon_compatibility
+service_slug_aliases
 ```
 
 ### Pricing

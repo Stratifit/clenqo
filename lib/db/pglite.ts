@@ -25,7 +25,11 @@ export async function createPglite(): Promise<PgliteHandle> {
       params?: unknown[],
     ): Promise<{ rows: T[]; rowCount: number }> {
       const res = await db.query<T>(sql, params as never[]);
-      return { rows: res.rows, rowCount: res.rows.length };
+      // Match PostgreSQL semantics: rowCount is the number of rows affected
+      // by INSERT/UPDATE/DELETE. pglite exposes that as affectedRows (SELECT
+      // leaves it undefined); rows.length is the correct fallback.
+      const affected = (res as { affectedRows?: number }).affectedRows;
+      return { rows: res.rows, rowCount: affected ?? res.rows.length };
     },
   };
 
