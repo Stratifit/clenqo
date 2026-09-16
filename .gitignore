@@ -18,3 +18,6 @@ supabase/.temp/
 # misc
 *.tsbuildinfo
 .DS_Store
+
+# codebuff/freebuff agent tool runtime state
+.freebuff/
