@@ -864,7 +864,6 @@ Additional states:
 ```text
 CANCELLED
 NO_SHOW
-FAILED
 ```
 
 Only valid transitions may be performed.

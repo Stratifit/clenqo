@@ -569,7 +569,6 @@ IN_PROGRESS
 COMPLETED
 CANCELLED
 NO_SHOW
-FAILED
 ```
 
 The exact transition rules will be defined in `BOOKING_SYSTEM.md`.

@@ -194,6 +194,15 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 * **Recommended resolution:** Either remove `FAILED` from REQUIREMENTS §12 (aligning with BOOKING_SYSTEM/DATABASE) or define its semantics in BOOKING_SYSTEM and add it to DATABASE §19. Given payment failure is deliberately not a booking state, removal is likely correct.
 
+> **RESOLVED (2026-09, by owner decision BD-1 — Option A):** `FAILED` is not a
+> persistent Booking lifecycle state in V1. `REQUIREMENTS.md` §12 and
+> `ARCHITECTURE.md` §29 were corrected; the authoritative state set remains
+> `BOOKING_SYSTEM.md` §29 / `DATABASE.md` §19 (draft, pending, confirmed,
+> assigned, in_progress, completed, cancelled, no_show). A failed booking
+> confirmation rolls back transactionally with no persisted booking and its
+> slot hold released (SCHEDULING_SYSTEM §84; scheduling-availability spec);
+> payment failure remains a payment-domain state (PAYMENT_SYSTEM §10–11).
+
 ## HIGH-5 — Cancellation fee presentation: percentage vs amount basis undefined
 
 * **ID:** HIGH-5
