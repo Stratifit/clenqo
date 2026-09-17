@@ -968,6 +968,18 @@ they are not separate columns.
 
 Customers do not require traditional user accounts.
 
+> **Implemented (Change 5, migration `0011_booking.sql`, BD-4):** customers
+> are organization-scoped with normalized match/store columns
+> `email_normalized` (trim + lowercase, CHECK shape) and `phone_e164`
+> (E.164 CHECK, nullable). Uniqueness is organization-wide via standalone
+> unique indexes `uq_customers_org_email (organization_id, email_normalized)`
+> and `uq_customers_org_phone (organization_id, phone_e164)` (partial —
+> `WHERE phone_e164 IS NOT NULL`; a NULL phone never conflicts). Matching is
+> email first, then phone; on a match with differing entered contact details
+> the stored canonical values are kept, `contact_conflict_flag` is raised,
+> and a `contact_conflict_flagged` booking event is written; staff resolve
+> conflicts via `customers.edit`.
+
 Suggested fields:
 
 ```text
@@ -1019,6 +1031,24 @@ Location information should be used only where necessary for service operations.
 ## 18.1 `bookings`
 
 This is one of the most important operational tables.
+
+> **Implemented (Change 5, migration `0011_booking.sql`):** the booking
+> schema below is realized with BD-1/BD-2/BD-3/BD-5 semantics — 8-state
+> lifecycle CHECK (no FAILED) with a transition-guard trigger, `booking_number`
+> in the `CLN-<year>-<6-digit>` format (CHECK + UNIQUE per organization,
+> allocated from the monotonic per-organization `booking_number_sequences`
+> row so year transitions never collide), immutable `service_address` jsonb
+> snapshot (TD-4), `pricing_version_id` + `cancellation_policy_snapshot` jsonb
+> captured at confirmation, `cancellation_fee_minor` / `amount_owed_minor`,
+> `reschedule_count`, same-branch composite FKs to catalog entities on items,
+> append-only `booking_events`, and `booking_pricing_snapshots` as an
+> append-only history (`seq` per booking, partial UNIQUE `is_current`) — each
+> reschedule appends a new authoritative snapshot and preserves prior ones
+> (TD-3.2). Magic-link tokens (`customer_magic_link_tokens`, SHA-256 hash
+> only, single-use, expiring, revocable, booking-scoped) are deny-all to
+> application roles via RLS; `booking_idempotency_keys` (TD-5) and the
+> minimal `notification_outbox` (TD-6, rows written transactionally, delivery
+> deferred to the Notification change) complete the table set.
 
 Suggested fields:
 
@@ -2662,6 +2692,46 @@ The pricing entities above are **implemented** by migration
   fixed-amount CHECK, published/archived immutability enforced by triggers
   (cascade-depth deletes via referential actions still permitted for
   container teardown).
+
+The booking entities above are **implemented** by migration
+`0011_booking.sql` (Change 5; owner decisions BD-1–BD-6, B-NEW-1, TD-1,
+recorded in `openspec/changes/create-booking/design.md`). Field-level facts:
+
+* `customers` / `customer_addresses`: organization-scoped identity (BD-4
+  normalized columns, org-wide unique indexes, conflict flag) and address
+  book; bookings embed an immutable address snapshot rather than a live FK
+  (TD-4).
+* `branch_service_areas` (BD-6): per-branch postal-code allowlist, UNIQUE
+  `(branch_id, postal_code)`, managed via the existing `branches.edit`
+  permission; bookings outside the allowlist are rejected before any hold is
+  created.
+* `branch_cancellation_policies` (BD-2): versioned, effective-dated,
+  published content immutable (P17 mechanics — EXCLUDE on overlapping
+  published windows plus an immutability trigger with cascade-depth
+  allowance); seeded per branch with the documented 0/25/50/100 tiers
+  (structure only).
+* `booking_number_sequences` (BD-5): one monotonic counter row per
+  organization, row-locked inside the confirmation transaction; the year is
+  rendered from the branch-local service date, so year transitions cannot
+  produce duplicate numbers.
+* `bookings` + `booking_items` + `booking_events` +
+  `booking_pricing_snapshots`: 8-state lifecycle (no FAILED, BD-1) guarded by
+  a trigger; append-only events; append-only snapshot history with one
+  `is_current` row per booking (TD-3.2); items carry same-branch composite
+  FKs to catalog entities (history survives catalog edits via SET NULL).
+* `customer_magic_link_tokens` (TD-3): SHA-256 hash only, single-use,
+  expiring, revocable, scoped to one booking; RLS deny-all to application
+  roles.
+* `booking_idempotency_keys` (TD-5): UNIQUE `(organization_id, scope, key)`
+  with request-hash replay detection.
+* `notification_outbox` (TD-6): minimal transactional enqueue
+  (`booking_confirmation_email`, `booking_cancellation_email`,
+  `booking_reschedule_email`, `magic_link_email`); delivery/retry belongs to
+  the future Notification change.
+* No `jobs`/`employees`/assignment tables are created by Change 5 (TD-1):
+  the Worker change will create jobs idempotently from confirmed bookings.
+  Committed bookings occupy scheduling capacity via the `bookings` table
+  (TD-3.1) until jobs exist.
 
 Payments, invoices, notifications, reviews, advanced workforce scheduling, and advanced quality systems can follow after the operational foundation is stable.
 

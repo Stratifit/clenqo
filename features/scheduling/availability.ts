@@ -232,6 +232,31 @@ async function loadOccupied(branchId: string, windowStart: Date, windowEnd: Date
     }
   }
 
+  // Committed bookings occupy capacity too (design TD-3.1): once jobs are
+  // deferred to the Worker change, a confirmed booking IS the reservation.
+  // Cancelled bookings never occupy; no_show/completed are past-start in
+  // practice but are kept here for window-overlap correctness. Same probe
+  // pattern as `jobs` — a missing relation must not abort a transaction.
+  const bookingsExists = await query<{ exists: boolean }>(
+    `select to_regclass('public.bookings') is not null as exists`,
+  );
+  if (bookingsExists.rows[0]?.exists) {
+    const bookings = await query<{ scheduled_start: string; scheduled_end: string }>(
+      `select b.scheduled_start, b.scheduled_end
+       from public.bookings b
+       where b.branch_id = $1
+         and b.status in ('confirmed', 'assigned', 'in_progress', 'completed')
+         and b.scheduled_start < $3::timestamptz and b.scheduled_end > $2::timestamptz`,
+      params,
+    );
+    for (const b of bookings.rows) {
+      out.push({
+        start: new Date(b.scheduled_start).getTime(),
+        end: new Date(b.scheduled_end).getTime(),
+      });
+    }
+  }
+
   return out;
 }
 

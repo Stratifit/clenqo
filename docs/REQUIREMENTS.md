@@ -530,11 +530,25 @@ The system must prevent invalid or conflicting bookings.
 
 Where sufficient information is available, the system should calculate the price before the customer confirms the booking.
 
+> **Implemented (Change 5):** instant pricing comes from the Pricing Engine
+> quote; the confirmation transaction recalculates authoritatively and
+> compares against the customer-accepted total (TD-2: a mismatch rejects with
+> `PRICE_CHANGED`, the hold stays within TTL, the customer re-accepts).
+
 ---
 
 ## BK-006 — Booking Confirmation
 
 After a successful booking, the customer should receive confirmation.
+
+> **Implemented (Change 5):** confirmation is a single server-authoritative
+> transaction (catalog gate → service-area gate → slot hold → final
+> feasibility re-check → hold consumption → booking + item snapshots +
+> pricing snapshot + cancellation-policy snapshot + events + audit +
+> outbox + idempotency result). A confirmation email is enqueued
+> transactionally to the notification outbox (delivery is the Notification
+> change). Failure rolls back completely and leaves no persisted booking
+> (BD-1).
 
 ---
 

@@ -13,8 +13,10 @@ export const PERMISSIONS = [
   "pages.view", "pages.create", "pages.edit", "pages.archive", "pages.publish",
   "media.view", "media.upload", "media.manage",
   "seo.view", "seo.edit",
-  // bookings / customers
+  // bookings / customers (bookings.override: BD-2.4 dedicated cancellation-
+  // fee override capability, HQ Admin only in V1 — SECURITY.md catalog)
   "bookings.view", "bookings.create", "bookings.edit", "bookings.cancel",
+  "bookings.override",
   "customers.view", "customers.edit",
   // workforce
   "employees.view", "employees.manage",

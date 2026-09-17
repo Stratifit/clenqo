@@ -849,6 +849,15 @@ Example:
 completed → confirmed
 ```
 
+> **Implemented (Change 5):** the booking transition guard is a database
+> trigger plus domain checks over the 8-state lifecycle (no FAILED state,
+> BD-1); `markNoShow` maps to the `no_show` operational outcome from
+> `confirmed`/`assigned` (future action surface). Rescheduling is not a
+> state change — a successful reschedule keeps the booking's status and
+> records a `booking_rescheduled` event (BD-3). Booking mutations are
+> server actions guarded by the permission catalog
+> (`bookings.view/create/edit/cancel`, HQ-Admin-only `bookings.override`).
+
 must not be silently accepted.
 
 ---

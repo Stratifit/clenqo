@@ -263,6 +263,41 @@ The problems are concentrated in **cross-document detail drift** that was introd
   These remain open implementation-design items and are NOT resolved by the
   business policy decision.
 
+## Booking implementation — documentation sync + TD closures (2026-09, Change 5)
+
+* **Scope:** the booking core is implemented by migration `0011_booking.sql`
+  and `features/booking/`, per the approved OpenSpec change
+  `create-booking` (owner decisions BD-1–BD-6, B-NEW-1, TD-1). Documentation
+  synchronized: `BOOKING_SYSTEM.md` (implementation-status header; §29/§30
+  transition guard + no-FAILED note), `DATABASE.md` (§17.1/§18.1 implemented
+  notes; §65 booking field-level facts), `REQUIREMENTS.md` (BK-005/BK-006
+  implementation notes), `API_STANDARDS.md` (transition-guard note;
+  `markNoShow` mapping; rescheduling-is-an-event), `NOTIFICATION_SYSTEM.md`
+  (minimal outbox implemented, delivery deferred).
+* **Technical decisions closed by the Change 5 design (all recorded in the
+  OpenSpec design and implemented):** TD-2 (authoritative recalculation with
+  zero-drift accepted-total comparison), TD-3 (hashed single-use token table,
+  deny-all RLS), TD-3.1 (hold-then-commit reschedule swap; committed bookings
+  occupy capacity via `bookings`), TD-3.2 (append-only snapshot history with
+  partial UNIQUE `is_current`), TD-3.3 (per-attempt idempotency keys + row
+  locking + optimistic `expected_current_scheduled_start` echo), TD-3.4
+  (booking event payload schema incl. `price_delta_minor` and
+  `reschedule_count`), TD-3.5 (outbox trigger mapping), TD-4 (immutable
+  address snapshot on the booking), TD-5 (idempotency key table UNIQUE
+  `(organization_id, scope, key)` with request-hash replay detection), TD-6
+  (minimal transactional outbox, delivery deferred to the Notification
+  change).
+* **B-NEW-1 deferral recorded (owner decision):** the Booking Hub's
+  "Contact CLENQO" element renders branch contact information only. There is
+  no `booking_messages` table, no conversation threads, and no two-way
+  messaging in Change 5. Customer messaging is an explicit future capability,
+  not a silent gap.
+* **TD-1 boundary honored:** no `jobs`, `employees`, or assignment tables
+  were created by Change 5; the confirmed-booking → job handoff contract is
+  documented (Worker change creates jobs idempotently from confirmed
+  bookings), and committed bookings occupy scheduling capacity via the
+  `bookings` table until jobs exist.
+
 ## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment
 
 * **ID:** HIGH-6

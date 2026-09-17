@@ -1,5 +1,19 @@
 # CLENQO Booking System
 
+> **Implementation status (Change 5, migration `0011_booking.sql`):** the
+> booking core described in this document is **implemented and
+> hosted-verified** — the twelve-table booking schema (customers, customer
+> addresses, per-branch service areas, cancellation policies, booking-number
+> sequences, bookings, items, events, pricing snapshots, magic-link tokens,
+> idempotency keys, notification outbox), the confirmation transaction
+> (catalog gate → service-area gate → slot hold → final feasibility re-check →
+> hold consumption → authoritative price recalculation → booking + snapshots
+> + events + audit + outbox, all atomic), BD-2 cancellation mechanics, BD-3
+> rescheduling, and the magic-link Booking Hub contracts. Jobs/employees are
+> deliberately absent (TD-1: the Worker change owns them); payment collection
+> is not implemented; the Booking Hub UI renders branch contact information
+> only (B-NEW-1: no messaging).
+
 ## 1. Purpose
 
 The CLENQO Booking System manages the complete lifecycle of a cleaning booking from customer request to completed service.
@@ -600,7 +614,10 @@ cancelled
 no_show
 ```
 
-The state machine must define valid transitions.
+The state machine must define valid transitions. Valid transitions are
+enforced by a database trigger guard plus the domain layer, per the table in
+§30. There is no `failed` booking state (BD-1): a failed confirmation rolls
+back and leaves no persisted booking.
 
 ---
 

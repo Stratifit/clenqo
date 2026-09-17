@@ -789,6 +789,14 @@ This prevents lost notifications caused by application crashes between database 
 
 The first implementation may use a simple reliable database-backed event/outbox mechanism rather than introducing a large external message broker.
 
+> **Implemented (Change 5, minimal outbox):** migration `0011_booking.sql`
+> creates `notification_outbox` and the booking flow writes rows
+> transactionally with the business operation for four event types:
+> `booking_confirmation_email`, `booking_cancellation_email`,
+> `booking_reschedule_email`, and `magic_link_email`. Rows remain `pending`;
+> the delivery worker, retry loop, and channels are the Notification
+> change's scope.
+
 Do not add Kafka or similar infrastructure without a demonstrated need.
 
 ---
