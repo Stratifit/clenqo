@@ -600,7 +600,15 @@ The policy should be configurable and capable of considering the time remaining 
 
 The initial business policy may support different cancellation charges based on cancellation timing.
 
-Exact values will be defined in the business/pricing documentation.
+Exact values are defined in `BOOKING_SYSTEM.md` §38–40 (owner decision BD-2,
+2026-09): branch-configurable versioned/effective-dated policy snapshotted at
+booking confirmation; windows measured to the scheduled service START; the
+fee derives from the booking's immutable pricing snapshot (tax included,
+tips excluded, half-up minor-unit rounding); fee overrides require the
+dedicated `bookings.override` permission (HQ Admin only in V1) and are
+audited; customer cancellation is not permitted at/after the scheduled
+start; a non-zero fee on an unpaid cancelled booking becomes an amount owed
+by the customer.
 
 ---
 

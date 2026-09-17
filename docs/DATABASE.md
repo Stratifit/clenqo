@@ -1086,7 +1086,14 @@ in_progress
 completed
 ```
 
-Cancellation must follow defined business rules.
+Cancellation must follow defined business rules. These rules are fixed by
+owner decision BD-2 (2026-09): cancellation windows relative to
+`scheduled_start`; fee from the booking's immutable `pricing_snapshot`
+(tax included, tips excluded, half-up minor-unit rounding); branch-scoped
+versioned/effective-dated policy snapshotted at confirmation; overrides via
+the dedicated `bookings.override` permission (HQ Admin only), audited. The
+policy-version storage and fee-persistence schema are deferred to the Booking
+implementation design.
 
 ---
 

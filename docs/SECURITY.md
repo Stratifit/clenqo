@@ -354,6 +354,7 @@ bookings.view
 bookings.create
 bookings.edit
 bookings.cancel
+bookings.override
 
 customers.view
 customers.edit
@@ -417,7 +418,8 @@ services.edit
 # pages.view / pages.create / pages.edit / pages.archive / pages.publish
 # media.view / media.upload / media.manage
 # seo.view / seo.edit
-# bookings.view / bookings.create / bookings.edit / bookings.cancel
+# bookings.view / bookings.create / bookings.edit / bookings.cancel /
+#   bookings.override (BD-2: cancellation-fee override, HQ Admin only)
 # customers.view / customers.edit
 # employees.view / employees.manage
 # jobs.view / jobs.assign / jobs.manage
@@ -454,6 +456,17 @@ Branch scheduling configuration (operating hours, schedule exceptions,
 scheduling parameters, slot-hold administration) is governed by the existing
 catalog permissions **`branches.view`** / **`branches.edit`** — no new
 permission family is introduced.
+
+### Resolved security decision — cancellation-fee override (2026-09)
+
+Owner decision **BD-2.4** added the dedicated permission **`bookings.override`**
+to the catalog: waiving or reducing a calculated cancellation fee requires it,
+and generic `bookings.edit` / `bookings.cancel` do not authorize an override.
+Role mapping (V1, explicit owner decision): `hq_admin` YES; `hq_staff` NO;
+`branch_manager` NO; `cleaner` NO; customers NO. Every override is audited,
+preserving at minimum: actor, timestamp, booking, original calculated fee,
+final fee, and reason. The application-level role mapping is updated with the
+Booking implementation.
 
 ---
 

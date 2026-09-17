@@ -729,21 +729,51 @@ Under 2 hours:
 100%
 ```
 
-The final implementation should calculate the applicable fee based on the configured branch policy.
+Decision BD-2 (2026-09): the policy is **branch-scoped, configurable,
+versioned, and effective-dated**. Each booking captures the applicable policy
+snapshot at confirmation; later policy changes never retroactively modify an
+existing confirmed booking. The tiers above are the documented default
+content, with the confirmed interval reading:
+
+```text
+[24h, infinity) → 0%      (exactly 24h → 0%)
+[12h, 24h)      → 25%     (exactly 12h → 25%)
+[2h, 12h)       → 50%     (exactly 2h  → 50%)
+[0h, 2h)        → 100%
+```
+
+Policy configuration changes must produce the documented
+`cancellation_policy.updated` audit event (LEGAL_COMPLIANCE §71). The storage
+model for branch policy versions is deferred to the Booking implementation
+design.
 
 ---
 
 # 39. Cancellation Calculation
 
-Cancellation fee should consider:
+Cancellation windows are calculated relative to the **scheduled service
+START** (`scheduled_start`), never `scheduled_end` (decision BD-2.1). The
+notice is `scheduled_start − cancellation_request_time`, computed on absolute
+UTC instants and presented in the branch timezone. A customer cancellation is
+**not permitted once the current time has reached `scheduled_start`**
+(decision BD-2.5): the customer window ends at service start, the documented
+post-start operational outcome is `no_show` (§78), and completed bookings are
+never cancellable.
+
+The cancellation fee is calculated from the booking's **immutable pricing
+snapshot** (decision BD-2.2):
 
 ```text
-scheduled service time
-current time
-policy
-booking total
-exceptions
+cancellation_fee =
+  applicable_policy_percentage
+  × authoritative booking total (including applicable tax, excluding tips)
 ```
+
+rounded half-up to the currency's minor unit (the Pricing Engine rounding
+convention). The current Pricing Engine must never be invoked to recalculate
+a historical booking; the confirmed booking's snapshot is authoritative.
+Pricing owns creating and preserving the snapshot; Booking owns applying the
+cancellation policy to it.
 
 The server must calculate the final fee.
 
@@ -764,8 +794,15 @@ force majeure
 ```
 
 Authorized staff may override normal cancellation rules when justified.
-
 Overrides must be audited.
+
+Decision BD-2.4 (2026-09): waiving or reducing a calculated cancellation fee
+requires the dedicated permission **`bookings.override`** — generic
+`bookings.edit` / `bookings.cancel` do not authorize a fee override. In V1 it
+is granted to **HQ Admin only** (the `pricing.override` precedent); HQ Staff,
+Branch Managers, cleaners, and customers cannot override cancellation fees.
+Every override must be audited, preserving at minimum: actor, timestamp,
+booking, original calculated fee, final fee, and reason.
 
 ---
 
@@ -1560,6 +1597,13 @@ Refund
 The booking domain determines the business outcome.
 
 The payment domain performs the provider transaction.
+
+For a booking cancelled **before any payment** (the V1 default is payment
+after completion), a non-zero cancellation fee becomes an **amount owed by
+the customer** (decision BD-2.6). The booking domain records the obligation;
+the collection mechanism (provider charge, invoice, manual payment, or
+another explicitly defined flow) belongs to the Payment domain and is
+intentionally not fixed here.
 
 ---
 

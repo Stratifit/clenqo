@@ -216,6 +216,20 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 * **Recommended resolution:** Add to BOOKING_SYSTEM §39 (or PAYMENT_SYSTEM): fee base (authoritative booking total from the price snapshot, excl. tips), behavior for unpaid vs paid bookings, and the requirement that the fee derive from the booking's stored cancellation-policy snapshot.
 
+> **RESOLVED (2026-09, by owner decision BD-2):** the cancellation-fee basis
+> is the booking's immutable pricing snapshot total (including applicable
+> tax, excluding tips), rounded half-up to the currency minor unit; windows
+> are measured to the scheduled service START with the confirmed interval
+> reading (exactly 24h → 0%, exactly 12h → 25%, exactly 2h → 50%); the policy
+> is branch-scoped, versioned, effective-dated, and snapshotted at booking
+> confirmation; fee overrides use the dedicated `bookings.override`
+> permission (HQ Admin only in V1) and are audited (actor, timestamp,
+> booking, original fee, final fee, reason); customer cancellation is not
+> permitted at/after the scheduled start (`no_show` is the post-start
+> operational outcome); a non-zero fee on an unpaid cancelled booking becomes
+> an amount owed by the customer — the collection mechanism remains deferred
+> to Payment work. Normative text: `BOOKING_SYSTEM.md` §38–40, §83.
+
 ## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment
 
 * **ID:** HIGH-6
