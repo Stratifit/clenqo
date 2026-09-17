@@ -230,6 +230,39 @@ The problems are concentrated in **cross-document detail drift** that was introd
 > an amount owed by the customer — the collection mechanism remains deferred
 > to Payment work. Normative text: `BOOKING_SYSTEM.md` §38–40, §83.
 
+## Rescheduling policy drift — RESOLVED (2026-09, owner decision BD-3)
+
+* **Concept:** Booking rescheduling — scope, states, deadlines, fees, pricing,
+  and permission shape (`BOOKING_SYSTEM.md` §47–48, `REQUIREMENTS.md` BK-007,
+  `ROADMAP.md` §13 vs §92 "rescheduling automation", `DATABASE.md` §19).
+* **Problem:** Rescheduling was referenced across documents but never defined:
+  no reschedule rows existed in the §30 transition table, §48's flow had no
+  capacity-reservation step, ROADMAP listed reschedule as a Phase 1 magic-link
+  capability while BOOKING_SYSTEM listed "rescheduling automation" as future
+  without distinguishing the two, and BK-007 was permissive ("may include
+  Reschedule").
+* **Resolution (owner decisions BD-3.1–3.8, 2026-09):** rescheduling is V1 for
+  both customers (magic link) and staff; reschedulable states are
+  `confirmed`/`assigned` only; customer requests require ≥2h before the
+  current `scheduled_start` (at/after start BD-2.5's prohibition and `no_show`
+  apply); the target slot must satisfy the full 24-hour minimum-notice rule
+  (no same-day targets); rescheduling is free (BD-2 tiers never apply to the
+  reschedule operation) and unlimited; the cancellation window restarts from
+  the new `scheduled_start`; price increases require explicit customer
+  acceptance, decreases apply automatically with the new snapshot becoming
+  authoritative (prior snapshots preserved as history); internal authority is
+  the existing `bookings.edit` permission (hq_admin/hq_staff/branch_manager)
+  — no `bookings.reschedule` permission was added, and `bookings.override`
+  remains the HQ-Admin-only fee-override authority. `BOOKING_SYSTEM.md` §47–48
+  are now normative; ROADMAP §13 now distinguishes manual V1 rescheduling from
+  future automation. Normative text: `BOOKING_SYSTEM.md` §47–48.
+* **Still open (technical, Change 5 design):** TD-3.1 hold strategy for the
+  target slot (§48's flow as written has a check-then-commit gap), TD-3.2
+  snapshot-history storage, TD-3.3 reschedule idempotency/concurrency scope,
+  TD-3.4 event/audit payload schema, TD-3.5 notification trigger mapping.
+  These remain open implementation-design items and are NOT resolved by the
+  business policy decision.
+
 ## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment
 
 * **ID:** HIGH-6

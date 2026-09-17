@@ -1095,6 +1095,18 @@ the dedicated `bookings.override` permission (HQ Admin only), audited. The
 policy-version storage and fee-persistence schema are deferred to the Booking
 implementation design.
 
+Rescheduling is likewise fixed as business policy by owner decision BD-3
+(2026-09): only `confirmed`/`assigned` bookings may be rescheduled; customer
+requests require at least 2 hours before the current `scheduled_start`; the
+target slot must satisfy the full scheduling rules including the 24-hour
+minimum-notice rule; rescheduling is free and unlimited; a higher
+recalculated price requires explicit customer acceptance while a lower one
+applies automatically. Each reschedule produces a NEW pricing snapshot that
+becomes authoritative for the booking; prior snapshots remain as historical
+data. The physical snapshot-history storage design is a technical item
+(TD-3.2) deferred to the Booking implementation design. Rescheduling is
+event-driven (`booking_rescheduled`), not a booking status.
+
 ---
 
 # 20. `booking_items`

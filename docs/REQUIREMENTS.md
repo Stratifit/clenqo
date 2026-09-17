@@ -542,15 +542,23 @@ After a successful booking, the customer should receive confirmation.
 
 Customers must be able to manage bookings using secure magic links.
 
-Supported operations may include:
+Supported operations:
 
 * View
-* Reschedule
+* Reschedule (V1 capability per decision BD-3: permitted while the booking
+  status is `confirmed` or `assigned`; requests must be made at least 2 hours
+  before the current scheduled start; the new slot must satisfy the 24-hour
+  minimum-notice rule; rescheduling is free and unlimited; price increases
+  require explicit customer acceptance, price decreases apply automatically —
+  normative rules in `BOOKING_SYSTEM.md` §47–48)
 * Cancel
 * View details
 * Rebook
 
-Permissions depend on booking status and applicable policies.
+Permissions depend on booking status and applicable policies. Magic-link
+security requirements are defined in `SECURITY_PRIVACY.md` §29–33 and
+`DATABASE.md` §41; the concrete session mechanism remains a technical
+design decision for the Booking implementation.
 
 ---
 

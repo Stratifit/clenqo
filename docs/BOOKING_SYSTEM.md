@@ -958,6 +958,19 @@ Changes that affect:
 
 must trigger server-side recalculation.
 
+**Rescheduling scope (decision BD-3, 2026-09):** rescheduling — changing a
+booking's scheduled interval after confirmation — is supported in V1 for both
+customers (through the secure magic-link flow) and staff. A booking may be
+rescheduled only while its status is `confirmed` or `assigned`; `pending`
+bookings are edited through the normal re-confirmation flow instead, and
+`in_progress`, `completed`, `cancelled`, and `no_show` bookings are never
+reschedulable. Rescheduling keeps `booking_rescheduled` (§49) as an event —
+there is no `rescheduled` booking state. Staff rescheduling on behalf of a
+customer is exercised through the existing `bookings.edit` permission
+(hq_admin, hq_staff, branch_manager); no dedicated reschedule permission
+exists, and `bookings.override` remains exclusively the cancellation-fee
+override authority (§40).
+
 ---
 
 # 48. Booking Change Flow
@@ -979,6 +992,40 @@ Event created
  ↓
 Notifications sent
 ```
+
+**Rescheduling rules (decision BD-3, 2026-09):**
+
+* **Request deadline:** a customer may request a reschedule only at least
+  **2 hours before the current `scheduled_start`**; at/after
+  `scheduled_start` customer action is prohibited (§39, decision BD-2.5)
+  and the post-start operational outcome is `no_show` (§78). Staff
+  rescheduling within the permitted states follows the same feasibility
+  rules.
+* **Target slot:** the NEW requested slot must satisfy the full scheduling
+  rules as a fresh request, including the **24-hour minimum-notice rule**
+  (`SCHEDULING_SYSTEM.md` S4) — same-day reschedule targets are not
+  permitted. Operating hours, schedule exceptions, the 15-minute slot grid,
+  capacity, and DST rules apply unchanged.
+* **Frequency:** rescheduling is unlimited — there is no per-booking
+  reschedule count limit; every occurrence independently re-runs the
+  feasibility, notice, and state rules.
+* **Fee:** rescheduling is **FREE**. The cancellation fee tiers (§38) are
+  never applied to the reschedule operation itself, and no separate
+  reschedule-fee policy exists in V1. After a successful reschedule the
+  cancellation window is evaluated from the **NEW `scheduled_start`**
+  (decision BD-3.4b).
+* **Pricing:** the new date/time is priced by the Pricing Engine as a fresh
+  request (surcharge applicability, pricing version by the new service date)
+  producing a NEW pricing snapshot. If the recalculated price is **higher**,
+  the reschedule commits only after explicit customer acceptance of the new
+  price; if it is **lower**, the lower price is automatically applied. The
+  new snapshot becomes authoritative for the rescheduled booking, and the
+  original snapshot is preserved as historical data (never deleted).
+* **Transactional order and hold/idempotency mechanics** (temporary hold on
+  the target slot, old-slot release sequencing, idempotency keys, exact
+  event/audit payload) are technical design items **TD-3.1–TD-3.5**,
+  deliberately deferred to the Booking implementation (Change 5) design;
+  this section fixes business policy only.
 
 ---
 
@@ -1756,7 +1803,9 @@ Possible additions:
 * customer preferences
 * preferred cleaner
 * waitlists
-* rescheduling automation
+* rescheduling automation (automated/suggested rebooking flows — manual
+  customer and staff rescheduling is V1 per decision BD-3; only the
+  automation layer is future)
 * advanced capacity planning
 * quote requests
 * contracts

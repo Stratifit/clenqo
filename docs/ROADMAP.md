@@ -418,7 +418,9 @@ After booking, customers can manage bookings through secure magic links.
 Capabilities:
 
 * view booking;
-* reschedule;
+* reschedule (manual customer rescheduling is a Phase 1 capability per
+  decision BD-3 — subject to the rules in `BOOKING_SYSTEM.md` §47–48;
+  only rescheduling *automation* is a future capability);
 * cancel;
 * access permitted information;
 * view relevant payment/invoice information.
