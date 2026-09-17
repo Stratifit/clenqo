@@ -1555,6 +1555,14 @@ Service duration is owned by the Pricing Engine. Scheduling consumes the
 authoritative duration through an interface contract. Operational and travel
 buffers are separate from service duration.
 
+**Implemented (Change 4A):** the temporary placeholder duration provider was
+deleted; Scheduling's `DurationProvider` seam is now wired to the real Pricing
+Engine resolver (`features/pricing/durationProvider.ts`), which shares the
+quote engine's duration rule evaluation. `DurationSelection` accepts typed
+optional `propertyDetails`, validated with Zod; duration rules declare their
+consumed factors and missing required details raise a validation error.
+Scheduling still performs no duration calculation of its own.
+
 ### S6b — Buffer Defaults
 
 ```text
@@ -1675,4 +1683,5 @@ dedicated security decision (see §56).
    performing pricing calculations.
 
 The implementation must not duplicate pricing or duration calculation inside
-Scheduling.
+Scheduling. As of Change 4A the authoritative duration source is the
+implemented Pricing Engine (P21); the placeholder provider no longer exists.

@@ -1,10 +1,8 @@
 /**
  * Branch activation — a distinct authorized operation (BRANCH_SYSTEM §19).
  * Gate: `branches.activate` permission + provisioning `ready` + the documented
- * readiness checklist (§45, §74–75). Services/pricing/hours/notifications are
- * Phase-1 follow-ons and are intentionally reported as missing here —
- * activation therefore cannot succeed until those capabilities ship
- * (spec: "Activation blocked when requirements missing").
+ * readiness checklist (§45, §74–75). Items not yet configured are reported
+ * as missing — activation cannot succeed until configuration exists.
  */
 import { requirePermission, requireOrganizationAccess, hasBranchScope, type AuthContext } from "@/lib/authorization/server";
 import { writeAuditEvent } from "@/lib/audit/service";
@@ -20,9 +18,9 @@ export interface ReadinessItem {
 }
 
 /**
- * Mandatory configuration per BRANCH_SYSTEM §74. Items owned by future
+ * Mandatory configuration per BRANCH_SYSTEM §74. Items owned by later
  * Phase-1 changes are evaluated against current data and will list as
- * missing until implemented — the checklist must reflect real state.
+ * missing until configured — the checklist must reflect real state.
  */
 export async function evaluateReadiness(branch: BranchRecord): Promise<ReadinessItem[]> {
   const items: ReadinessItem[] = [];
@@ -38,17 +36,25 @@ export async function evaluateReadiness(branch: BranchRecord): Promise<Readiness
   items.push({
     requirement: "services",
     satisfied: Number(services.rows[0]?.count ?? 0) > 0,
-    note: "services domain ships in a later Phase-1 change",
+    note: "activate at least one service (catalog domain, Change 2)",
   });
 
+  // Pricing now has a real data model (Change 4A, P18): the per-branch seed
+  // provisions a structure-only draft profile; activation requires an ACTIVE
+  // profile with a published version (business configuration, P3).
   const pricing = await query<{ count: string }>(
-    `select count(*)::text as count from public.pricing_profiles where branch_id = $1 and status = 'active'`,
+    `select count(*)::text as count from public.pricing_profiles
+     where branch_id = $1 and status = 'active'
+       and exists (
+         select 1 from public.pricing_versions v
+         where v.pricing_profile_id = pricing_profiles.id and v.status = 'published'
+       )`,
     [branch.id],
   ).catch(() => ({ rows: [{ count: "0" }], rowCount: 1 }));
   items.push({
     requirement: "pricing",
     satisfied: Number(pricing.rows[0]?.count ?? 0) > 0,
-    note: "pricing domain ships in a later Phase-1 change",
+    note: "configure + publish pricing per branch (business value sheet pending, P3/P7b)",
   });
 
   // Operating hours now have a real data model (Change 3, S2): at least one

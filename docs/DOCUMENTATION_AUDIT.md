@@ -157,7 +157,7 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 * **Problem:** The "Initial Table Set" (§64) and "MVP Database Priority" (§65) omit:
 
-  * `pricing_versions` (required by PRICING_ENGINE's versioning model; DATABASE §16.3 stores `pricing_profile_version` on the booking instead — see CRITICAL-2);
+  * `pricing_versions` (required by PRICING_ENGINE's versioning model; DATABASE §16.3 stores `pricing_profile_version` on the booking instead — see CRITICAL-2) — **RESOLVED (2026-09, implemented):** `pricing_profiles`, `pricing_versions`, and `pricing_rules` are created by migration `0010_pricing_engine.sql` (decision record P1–P22), listed in DATABASE §64/§65, and documented in DATABASE §16 with the canonical booking snapshot model (`pricing_version_id` + single `pricing_snapshot` jsonb);
   * any magic-link/token table or column (DATABASE §41 and BOOKING_SYSTEM §"Magic Link" describe tokens with expiry/scope/revocation, but no storage representation appears in §64);
   * `holds` / temporary slot holds (SCHEDULING_SYSTEM §"Temporary Holds" describes a hold record with expiry) — **RESOLVED (2026-09, implemented):** the scheduling table set appears in DATABASE §64/§65 and is created by migration `0009_scheduling_availability.sql` (`branch_operating_hours`, `branch_schedule_exceptions`, `branch_scheduling_configuration`, `service_scheduling_rules`, `slot_holds`);
   * `payment_attempts`/webhook events (PAYMENT_SYSTEM describes provider events, idempotency, and retries; only `payments` and `refunds` are listed);
@@ -565,7 +565,7 @@ Legend: ✅ documented with fields · ⚠️ concept documented, representation 
 | Customer | DATABASE §17 | `customers`, `customer_addresses` | ⚠️ uniqueness/linkage rule missing (MEDIUM-7) |
 | Service catalog | DATABASE §15 | `services`, `service_translations`, `service_variants`, `service_addons` | ⚠️ per-branch vs global model ambiguous (MEDIUM-3) |
 | Pricing profile | DATABASE §16, PRICING_ENGINE | `pricing_profiles`, `pricing_rules` | ✅ |
-| Pricing version | PRICING_ENGINE §versioning | `pricing_versions` | ❌ **missing table** (CRITICAL-2, HIGH-2) |
+| Pricing version | PRICING_ENGINE §versioning | `pricing_versions` | ✅ implemented (Change 4A, migration 0010; HIGH-2 pricing residue closed) |
 | Booking | DATABASE §18 | `bookings` | ⚠️ snapshot columns conflict (CRITICAL-2) |
 | Booking items | DATABASE §20 | `booking_items` | ✅ |
 | Booking events | DATABASE §21 | `booking_events` | ✅ |

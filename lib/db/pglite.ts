@@ -2,8 +2,14 @@
  * In-process PostgreSQL (pglite) adapter — TEST-ONLY.
  * Used to genuinely execute the SQL migration chain, RLS policies, and
  * transaction behavior without external infrastructure.
+ *
+ * Extensions: the `btree_gist` contrib module is loaded so migrations may
+ * use EXCLUDE USING gist constraints (e.g. pricing effective-window overlap
+ * protection, migration 0010). It is a standard Supabase extension; hosted
+ * Supabase provides it natively — loading it here only mirrors that.
  */
 import { PGlite } from "@electric-sql/pglite";
+import { btree_gist as btreeGistExtension } from "@electric-sql/pglite/contrib/btree_gist";
 
 export interface PgliteHandle {
   client: {
@@ -17,7 +23,9 @@ export interface PgliteHandle {
 }
 
 export async function createPglite(): Promise<PgliteHandle> {
-  const db = new PGlite();
+  const db = new PGlite({
+    extensions: { btree_gist: btreeGistExtension },
+  } as ConstructorParameters<typeof PGlite>[0]);
 
   const client = {
     async query<T = Record<string, unknown>>(

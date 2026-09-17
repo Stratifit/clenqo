@@ -781,6 +781,18 @@ The final booking stores the required price snapshot.
 
 The pricing engine must remain deterministic.
 
+**Implemented shape (Change 4A):** `calculateQuote(input)` is stateless
+(P13) and returns `pricing_version_id`, a canonical `snapshot_source` (the
+single jsonb container: `inputs`, `rules_applied`, `result`), the component
+amounts (`base_amount`, `addon_amount`, `surcharge_amount`, `discount_amount`,
+`tax_amount`), `total`, `currency`, and `duration_minutes` — tax-exclusive
+(P15), half-up minor-unit rounding once per component with total equal to the
+exact component sum (P14). The same engine exposes the authoritative duration
+resolver consumed through Scheduling's `DurationProvider` seam (P21); the
+version resolved depends on branch, active profile, and the scheduled service
+date (P17). Inputs are Zod-validated; errors surface as stable
+`pricing_*` domain codes.
+
 ---
 
 # 28. Availability Contract

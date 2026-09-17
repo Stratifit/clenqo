@@ -175,6 +175,8 @@ export const availabilityRequestSchema = z.object({
   variantId: z.string().uuid().optional(),
   /** Query horizon length in days; clamped by branch config (S12). */
   days: z.number().int().min(1).max(90).optional(),
+  /** P-D1 (Change 4A): optional property details for the pricing duration rules. */
+  propertyDetails: z.record(z.string(), z.unknown()).optional(),
 });
 export type AvailabilityRequestInput = z.infer<typeof availabilityRequestSchema>;
 

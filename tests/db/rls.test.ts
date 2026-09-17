@@ -497,3 +497,103 @@ describe("RLS: audit immutability", () => {
     });
   });
 });
+
+describe("RLS: pricing engine (migration 0010, Change 4A task 8.3)", () => {
+  // Pricing fixtures inserted as harness (privileged client) — the same way
+  // the application's privileged server client writes pricing data after
+  // application-level authorization. ALL values are NON-PRODUCTION (P3).
+  let profileA1: string, versionA1: string, ruleA1: string;
+
+  beforeAll(async () => {
+    profileA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.pricing_profiles (organization_id, branch_id, name, currency)
+         values ($1, $2, 'RLS Profile', 'EUR') returning id`,
+        [orgA, branchA1],
+      )
+    ).rows[0].id;
+    versionA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.pricing_versions
+           (organization_id, branch_id, pricing_profile_id, version_number, effective_from)
+         values ($1, $2, $3, 1, '2026-01-01') returning id`,
+        [orgA, branchA1, profileA1],
+      )
+    ).rows[0].id;
+    ruleA1 = (
+      await t.db.query<{ id: string }>(
+        `insert into public.pricing_rules
+           (organization_id, branch_id, pricing_version_id, rule_type, configuration)
+         values ($1, $2, $3, 'surcharge', '{"kind":"sunday","model":"percentage","value":5,"stacking":"highest_only"}'::jsonb)
+         returning id`,
+        [orgA, branchA1, versionA1],
+      )
+    ).rows[0].id;
+  });
+
+  it("HQ admin reads own organization pricing rows", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      const profiles = await t.db.query<{ id: string }>(`select id from public.pricing_profiles`);
+      expect(profiles.rows.map((r) => r.id)).toEqual([profileA1]);
+      const versions = await t.db.query<{ id: string }>(`select id from public.pricing_versions`);
+      expect(versions.rows.map((r) => r.id)).toEqual([versionA1]);
+      const rules = await t.db.query<{ id: string }>(`select id from public.pricing_rules`);
+      expect(rules.rows.map((r) => r.id)).toEqual([ruleA1]);
+    });
+  });
+
+  it("cross-organization pricing is invisible regardless of known ids", async () => {
+    // Org B admin knows every id — RLS still hides org A's rows.
+    const orgBAdmin = await t.fx.createUser("pricing-admin@b.test");
+    await t.fx.createMembership(orgBAdmin, orgB, "hq_admin");
+    await asAuthenticatedUser(t.db, orgBAdmin, async () => {
+      for (const [table, id] of [
+        ["pricing_profiles", profileA1],
+        ["pricing_versions", versionA1],
+        ["pricing_rules", ruleA1],
+      ] as const) {
+        const probe = await t.db.query(`select * from public.${table} where id = $1`, [id]);
+        expect(probe.rows).toHaveLength(0);
+      }
+    });
+  });
+
+  it("branch manager reads only the assigned branch's pricing rows", async () => {
+    const scopedUser = await t.db.query<{ user_id: string }>(
+      `select user_id from public.memberships where id = $1`, [membershipA],
+    );
+    await asAuthenticatedUser(t.db, scopedUser.rows[0].user_id, async () => {
+      const profiles = await t.db.query<{ id: string }>(`select id from public.pricing_profiles`);
+      expect(profiles.rows.map((r) => r.id)).toEqual([profileA1]);
+    });
+  });
+
+  it("unauthenticated sees no pricing rows", async () => {
+    await asAuthenticatedUser(t.db, null, async () => {
+      const profiles = await t.db.query(`select id from public.pricing_profiles`);
+      expect(profiles.rows).toHaveLength(0);
+      const rules = await t.db.query(`select id from public.pricing_rules`);
+      expect(rules.rows).toHaveLength(0);
+    });
+  });
+
+  it("writes remain denied through the authenticated RLS path", async () => {
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(
+        t.db.query(
+          `insert into public.pricing_profiles (organization_id, branch_id, name, currency)
+           values ($1, $2, 'RLS Denied', 'EUR')`,
+          [orgA, branchA1],
+        ),
+      ).rejects.toThrow();
+    });
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(
+        t.db.query(`update public.pricing_profiles set name = 'Hijacked'`),
+      ).rejects.toThrow();
+    });
+    await asAuthenticatedUser(t.db, hqA, async () => {
+      await expect(t.db.query(`delete from public.pricing_rules`)).rejects.toThrow();
+    });
+  });
+});

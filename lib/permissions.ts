@@ -68,7 +68,7 @@ export const ROLE_PERMISSIONS: Record<
     "customers.view", "customers.edit",
     "employees.view", "employees.manage",
     "jobs.view", "jobs.assign", "jobs.manage",
-    "pricing.view", "pricing.create", "pricing.edit", "pricing.publish",
+    "pricing.view", // P20: HQ staff hold pricing.view ONLY
     "quality.view", "quality.report",
     "branches.view",
     "users.view",
@@ -87,7 +87,10 @@ export const ROLE_PERMISSIONS: Record<
     "customers.view", "customers.edit",
     "employees.view", "employees.manage",
     "jobs.view", "jobs.assign", "jobs.manage",
-    "pricing.view", "pricing.edit", "pricing.publish",
+    // P20: view/create/edit/publish/archive WITHIN branch scope (hasBranchScope
+    // enforces membership_branches at the domain layer).
+    "pricing.view", "pricing.create", "pricing.edit", "pricing.publish",
+    "pricing.archive",
     "quality.view", "quality.create_check", "quality.manage_issue",
     "quality.resolve_issue", "quality.report", "quality.manage",
     "branches.view",

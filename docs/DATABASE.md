@@ -857,9 +857,24 @@ Pricing is a business-critical domain.
 
 Pricing logic must not be scattered across UI components.
 
+> **Implemented (Change 4A, migration `0010_pricing_engine.sql`):** the model
+> below is realized as three organization- and branch-scoped tables —
+> `pricing_profiles` (grouping container, one active profile per branch),
+> `pricing_versions` (immutable once published; effective-dated window;
+> per-profile monotonic `version_number`; overlapping published windows
+> rejected by an EXCLUDE constraint), and `pricing_rules` (version-attached;
+> `rule_type` ∈ base_rate, duration_rule, difficulty, surcharge, discount,
+> tax, minimum_charge, minimum_duration, addon_price; immutable configuration
+> for published/archived versions). All carry `organization_id` + `branch_id`
+> NOT NULL with same-branch composite FKs, RLS per the established pattern
+> (no FORCE), and a branch-owned idempotent structure-only seed
+> (`seedPricingDefaults`) — no production money values are seeded.
+
 ## 16.1 `pricing_profiles`
 
-Represents a pricing configuration.
+Represents a pricing configuration. As implemented, a profile is a grouping
+container whose versions carry the rules; `status` ∈ draft/active/archived
+with at most one active profile per branch (P11).
 
 Suggested fields:
 
@@ -882,6 +897,8 @@ A pricing profile represents a coherent version of pricing rules.
 
 ## 16.2 `pricing_rules`
 
+As implemented, rules attach to a **pricing version** (`pricing_version_id`),
+not directly to a profile, and are immutable once that version is published.
 Suggested fields:
 
 ```text
@@ -2554,6 +2571,7 @@ services
 service_variants
 service_addons
 pricing_profiles
+pricing_versions
 pricing_rules
 
 customers
@@ -2605,6 +2623,26 @@ The scheduling entities above are **implemented** by migration
   `consumed_by_booking`; partial UNIQUE index enforces one ACTIVE hold per
   session; RLS as above. The single capacity-blocking mechanism (S1,
   MEDIUM-9 resolution).
+
+The pricing entities above are **implemented** by migration
+`0010_pricing_engine.sql` (decision record P1–P22,
+`PRICING_ENGINE.md` §82). Field-level facts:
+
+* `pricing_profiles`: one active profile per branch (partial UNIQUE index,
+  P11), `currency` CHECK-matched to the branch currency, UNIQUE
+  `(branch_id, name)`.
+* `pricing_versions`: per-profile monotonic `version_number` (UNIQUE
+  `(pricing_profile_id, version_number)`), `status` CHECK
+  (`draft | published | archived`), `effective_from` ≤ `effective_until`,
+  `tax_rate_percent`/`tax_jurisdiction` shape guard (both set together or
+  both null, P7b), EXCLUDE constraint rejecting overlapping published
+  effective windows per profile (P17), `published_at` set once at publish.
+* `pricing_rules`: `rule_type` CHECK (nine approved types), version-attached
+  (same-branch composite FK to `pricing_versions (id, branch_id)`), same-branch
+  composite FKs to catalog entities for service/variant/addon-scoped rules,
+  fixed-amount CHECK, published/archived immutability enforced by triggers
+  (cascade-depth deletes via referential actions still permitted for
+  container teardown).
 
 Payments, invoices, notifications, reviews, advanced workforce scheduling, and advanced quality systems can follow after the operational foundation is stable.
 

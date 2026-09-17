@@ -475,6 +475,13 @@ Custom Branch Pricing
 
 subject to HQ permissions.
 
+**Decision (P12, Change 4A):** pricing is **branch-owned** in V1 — every
+branch has its own pricing profile(s). "Global Default Pricing" is realized
+as an idempotent, structure-only per-branch seed template applied at
+provisioning (`seedPricingDefaults`), not as organization-global pricing
+data. At most one active published profile per branch in V1 (P11); no
+production money values are seeded (P3).
+
 ---
 
 ## PR-006 — Price Transparency

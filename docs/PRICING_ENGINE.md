@@ -1605,3 +1605,39 @@ These must not compromise deterministic pricing for confirmed bookings.
 # 81. Golden Pricing Rule
 
 > **Every CLENQO price must be calculated by an authoritative server-side pricing engine using an identifiable pricing version, explicit inputs, deterministic rules, and a preserved snapshot that explains exactly how the final amount was produced.**
+
+---
+
+# 82. Implementation Status (Change 4A — `create-pricing-engine`)
+
+The engine described in §§1–79 is **implemented** as of OpenSpec Change 4A
+(migration `0010_pricing_engine.sql`; domain module `features/pricing/`).
+Scope of the implementation:
+
+* **Implemented:** pricing profiles, versions, and rules (P1); the canonical
+  pipeline duration × rate × difficulty + add-ons + surcharges − discounts +
+  tax with the approved V1 stage activity (P2 — active: duration, base rate,
+  difficulty, add-ons, Sunday surcharge; inactive structure: minimums, night/
+  emergency/holiday surcharges, discounts, tax); highest-applicable-only
+  surcharge stacking (P5b); tax-exclusive storage (P15); half-up minor-unit
+  rounding once per component with total = exact component sum (P14);
+  effective-date version selection with overlapping published windows
+  rejected (P17); DB-enforced lifecycle and published immutability (P16);
+  stateless quotes (P13); single active published profile per branch (P11);
+  branch-owned pricing with an idempotent structure-only provisioning seed
+  (P12/P18); EUR at launch, configuration-driven (P8); **Pricing is the
+  single duration authority** and Scheduling's placeholder provider was
+  replaced by the real resolver (P21); typed optional `propertyDetails` in
+  the duration contract (P-D1).
+* **Structure only, awaiting business values:** difficulty multipliers,
+  surcharge percentages beyond the Sunday surcharge structure, discount
+  values, minimum charge/duration values, tax rate and jurisdiction (P3,
+  P7b). No production money values are seeded; production values come from a
+  separately approved business value sheet.
+* **Deferred:** pricing UI (P19), the `pricing.override` flow (permission
+  exists per P20; the flow is not implemented in V1), assessment/
+  quote-required path (P10), discounts as an active stage (P6).
+
+The authoritative V1 decision record (P1–P22, P-D1) lives in
+`openspec/specs/pricing-engine/spec.md` (promoted from Change 4A) with the
+full analysis in the archived change `openspec/archive/create-pricing-engine/design.md`.

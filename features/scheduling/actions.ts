@@ -37,7 +37,7 @@ import {
   type SlotHold,
 } from "./holds";
 import { validateSlotFeasibility, type FeasibilityResult } from "./feasibility";
-import { placeholderDurationProvider } from "./durationProvider";
+import { pricingDurationProvider } from "@/features/pricing/durationProvider";
 import { availabilityRequestSchema } from "./schemas/scheduling";
 import { parseOrThrow } from "./service";
 
@@ -130,7 +130,12 @@ export async function getAvailabilityAction(input: {
     void ctx;
     return getAvailability(
       { branchId: request.branchId, serviceId: request.serviceId, variantId: request.variantId, days: request.days },
-      placeholderDurationProvider,
+      pricingDurationProvider({
+        branchId: request.branchId,
+        serviceId: request.serviceId,
+        variantId: request.variantId,
+        propertyDetails: request.propertyDetails,
+      }),
     );
   });
 }
@@ -138,7 +143,21 @@ export async function getAvailabilityAction(input: {
 // -- Slot holds (S1) -------------------------------------------------------
 
 export async function createSlotHoldAction(input: unknown): Promise<Result<SlotHold>> {
-  return run((ctx) => createSlotHold(ctx, input as Parameters<typeof createSlotHold>[1]));
+  return run((ctx) =>
+    createSlotHold(
+      ctx,
+      input as Parameters<typeof createSlotHold>[1],
+      // P21: duration comes from the Pricing authority; the hold's slot
+      // re-verification consumes it (property details ride the raw input
+      // when the caller supplies them).
+      pricingDurationProvider({
+        branchId: (input as { branch_id?: string }).branch_id ?? "",
+        serviceId: (input as { service_id?: string }).service_id ?? "",
+        variantId: (input as { variant_id?: string | undefined }).variant_id,
+        propertyDetails: (input as { propertyDetails?: Record<string, unknown> }).propertyDetails,
+      }),
+    ),
+  );
 }
 
 export async function releaseSlotHoldAction(input: unknown): Promise<Result<null>> {
@@ -158,7 +177,13 @@ export async function validateSlotFeasibilityAction(input: unknown): Promise<Res
   return run((ctx) =>
     validateSlotFeasibility(
       input as Parameters<typeof validateSlotFeasibility>[0],
-      placeholderDurationProvider,
+      pricingDurationProvider({
+        branchId: (input as { branchId?: string }).branchId ?? "",
+        serviceId: (input as { serviceId?: string }).serviceId ?? "",
+        variantId: (input as { variantId?: string | undefined }).variantId,
+        propertyDetails: (input as { propertyDetails?: Record<string, unknown> }).propertyDetails,
+        scheduledDate: (input as { scheduledDate?: string | undefined }).scheduledDate,
+      }),
     ).then((r) => {
       void ctx;
       return r;

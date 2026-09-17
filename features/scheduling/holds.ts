@@ -38,7 +38,7 @@ import {
   type CreateSlotHoldInput,
   type ReleaseSlotHoldInput,
 } from "./schemas/scheduling";
-import { placeholderDurationProvider, type DurationProvider } from "./durationProvider";
+import type { DurationProvider } from "./durationProvider";
 import { getAvailability } from "./availability";
 import type { SchedulingConfig } from "./service";
 
@@ -108,7 +108,7 @@ async function requireHoldBranchAccess(ctx: AuthContext, branchId: string): Prom
 export async function createSlotHold(
   ctx: AuthContext,
   raw: CreateSlotHoldInput,
-  durationProvider: DurationProvider = placeholderDurationProvider,
+  durationProvider: DurationProvider,
   /** Determinism input for tests; production callers omit (server clock). */
   now: Date = new Date(),
 ): Promise<SlotHold> {
