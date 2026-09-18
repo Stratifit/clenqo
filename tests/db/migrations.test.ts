@@ -373,7 +373,7 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
     });
   });
 
-  it("keeps the migration chain file sequence intact (0001–0012)", async () => {
+  it("keeps the migration chain file sequence intact (0001–0013)", async () => {
     const { readdir } = await import("node:fs/promises");
     const files = (await readdir("supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
     expect(files).toEqual([
@@ -389,6 +389,7 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
       "0010_pricing_engine.sql",
       "0011_booking.sql",
       "0012_worker.sql",
+      "0013_cleaner_execution.sql", // Change 7 (BD-C): cleaner execution layer
     ]);
   });
 });

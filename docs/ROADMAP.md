@@ -577,6 +577,16 @@ Job detail should provide:
 > action queue, before/after/incident photos only, and completion gates
 > (check-in + mandatory checklist + no unresolved high/critical incident with
 > audited manager override).
+>
+> **Implemented (Change 7, create-cleaner-pwa):** the execution surface is
+> live at `/cleaner` (Today/Tomorrow/Upcoming/Completed job lists + job
+> detail): en_route → check-in → start work → checklist → notes → incident
+> reporting → before/after/incident_evidence photos → checkout → completion
+> with BD-C9 gates and audited `jobs.manage` manager override. Installable
+> PWA (manifest + service worker, app-shell caching only) with a lightweight
+> idempotent offline action queue (no offline media). Customer data stays
+> minimized to the BD-C1 field set; migration `0013_cleaner_execution.sql`
+> carries the checklist/media structures.
 
 ---
 

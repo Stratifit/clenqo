@@ -304,6 +304,18 @@ The problems are concentrated in **cross-document detail drift** that was introd
   authoritative occupancy source), and the outbox was extended for worker
   events with `booking_id` relaxed to nullable. Change 5 booking semantics
   are unchanged.
+* **Change 7 follow-up (implemented, migration `0013_cleaner_execution.sql`):
+  the cleaner execution layer (`create-cleaner-pwa`) implements the reserved
+  Worker surface on top of the Change 6 foundation — server-authoritative
+  execution contracts (en_route/check-in/start/checklist/checkout/completion,
+  BD-C2), service-scoped versioned checklist templates with immutable
+  per-job snapshots + items (BD-C3), private job-scoped media
+  (before/after/incident_evidence, BD-C4), a lightweight idempotent offline
+  action queue (BD-C5), in-app notification surface only (BD-C7), and BD-C9
+  completion gates (check-in + mandatory checklist + no unresolved
+  high/critical incident, audited `jobs.manage` override) invoking the
+  existing Booking-owned transition contract. No GPS (BD-C6), no customer
+  signature (BD-C8), no notification delivery, no new permissions.
 
 ## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment — RESOLVED (2026-09, owner decision BD-W1, Change 6)
 

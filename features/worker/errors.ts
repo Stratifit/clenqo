@@ -22,6 +22,16 @@ export const WorkerErrorCode = {
   JOB_NOT_FOUND: "job_not_found",
   BOOKING_NOT_CONFIRMED: "booking_not_confirmed",
   AVAILABILITY_CONFLICT: "availability_conflict",
+  // Change 7 (BD-C): cleaner execution surface.
+  NO_ACTIVE_ASSIGNMENT: "no_active_assignment",
+  NOT_ASSIGNED_CLEANER: "not_assigned_cleaner",
+  TRANSITION_INVALID: "execution_transition_invalid",
+  COMPLETION_BLOCKED: "completion_blocked",
+  CHECKLIST_SNAPSHOT_EXISTS: "checklist_snapshot_exists",
+  CHECKLIST_ITEM_NOT_FOUND: "checklist_item_not_found",
+  MEDIA_CATEGORY_INVALID: "media_category_invalid",
+  MEDIA_LIMIT_EXCEEDED: "media_limit_exceeded",
+  MEDIA_UNAUTHORIZED: "media_unauthorized",
 } as const;
 
 export type WorkerErrorCodeValue = (typeof WorkerErrorCode)[keyof typeof WorkerErrorCode];
@@ -40,7 +50,17 @@ function platformCodeFor(code: WorkerErrorCodeValue): ErrorCodeValue {
     case WorkerErrorCode.JOB_ALREADY_EXISTS:
     case WorkerErrorCode.BOOKING_NOT_CONFIRMED:
     case WorkerErrorCode.AVAILABILITY_CONFLICT:
+    case WorkerErrorCode.TRANSITION_INVALID:
+    case WorkerErrorCode.COMPLETION_BLOCKED:
+    case WorkerErrorCode.CHECKLIST_SNAPSHOT_EXISTS:
+    case WorkerErrorCode.MEDIA_CATEGORY_INVALID:
+    case WorkerErrorCode.MEDIA_LIMIT_EXCEEDED:
       return ErrorCode.CONFLICT;
+    case WorkerErrorCode.NO_ACTIVE_ASSIGNMENT:
+    case WorkerErrorCode.NOT_ASSIGNED_CLEANER:
+    case WorkerErrorCode.CHECKLIST_ITEM_NOT_FOUND:
+    case WorkerErrorCode.MEDIA_UNAUTHORIZED:
+      return ErrorCode.FORBIDDEN;
     case WorkerErrorCode.EMPLOYEE_NOT_FOUND:
     case WorkerErrorCode.JOB_NOT_FOUND:
       return ErrorCode.NOT_FOUND;
@@ -64,7 +84,23 @@ const SAFE_MESSAGES: Record<WorkerErrorCodeValue, string> = {
   [WorkerErrorCode.JOB_NOT_FOUND]: "Job not found.",
   [WorkerErrorCode.BOOKING_NOT_CONFIRMED]: "The booking must be confirmed before work can be scheduled.",
   [WorkerErrorCode.AVAILABILITY_CONFLICT]: "This employee's availability does not cover the job window.",
+  [WorkerErrorCode.NO_ACTIVE_ASSIGNMENT]: "You do not have an active assignment for this job.",
+  [WorkerErrorCode.NOT_ASSIGNED_CLEANER]: "This job is not assigned to you.",
+  [WorkerErrorCode.TRANSITION_INVALID]: "This action is not available for the job in its current state.",
+  [WorkerErrorCode.COMPLETION_BLOCKED]: "Completion is blocked until all execution requirements are met.",
+  [WorkerErrorCode.CHECKLIST_SNAPSHOT_EXISTS]: "A checklist snapshot already exists for this job.",
+  [WorkerErrorCode.CHECKLIST_ITEM_NOT_FOUND]: "Checklist item not found.",
+  [WorkerErrorCode.MEDIA_CATEGORY_INVALID]: "This media category is not permitted.",
+  [WorkerErrorCode.MEDIA_LIMIT_EXCEEDED]: "The media size or count limit was exceeded.",
+  [WorkerErrorCode.MEDIA_UNAUTHORIZED]: "You are not authorized for this media operation.",
 };
+
+/** BD-C9 gate failure: COMPLETION_BLOCKED with the specific unmet gates. */
+export interface CompletionGateDetail {
+  requires_check_in: boolean;
+  pending_mandatory_items: string[]; // item labels (cleaner-safe)
+  blocking_incidents: number;
+}
 
 /** §58-style error factory: every code raises a controlled AppError. */
 export function workerError(

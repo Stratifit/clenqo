@@ -1190,7 +1190,9 @@ Operational data should remain structured.
 > localization architecture; the employee's `preferred_language` is the
 > default cleaner UI language with the standard fallback rules, and dates and
 > times render in the branch-local timezone. Launch locales remain
-> de/en/fr/es.
+> de/en/fr/es. **Implemented (Change 7):** cleaner routes render through the
+> shared locale context with `preferred_language` defaulting; execution
+> timestamps display in the job's branch timezone.
 
 ---
 

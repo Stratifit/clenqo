@@ -643,6 +643,11 @@ Possession of a signed URL should be treated as sensitive.
 > size/type allow-lists configured in the Media Storage implementation,
 > short-lived signed URLs generated only after Cleaner-scope authorization,
 > and no public exposure path. Offline photo upload is out of scope for V1.
+> **Implemented (Change 7):** `features/worker/media.ts` issues signed URLs
+> only after active-assignment authorization; the bucket name comes from
+> `SUPABASE_MEDIA_BUCKET` configuration (default `media`); `job_media` rows
+> (migration `0013_cleaner_execution.sql`) enforce category, incident
+> linkage for `incident_evidence`, and per-job deduplication.
 
 ---
 

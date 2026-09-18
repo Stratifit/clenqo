@@ -482,13 +482,17 @@ export async function completeJob(ctx: { userId: string }, jobId: string): Promi
     );
     const job = jobRes.rows[0];
     if (!job) throw workerError(WorkerErrorCode.JOB_NOT_FOUND);
-    if (job.status !== "assigned") {
+    // Staff-authoritative override path (BD-C9): manager completion bypasses
+    // the cleaner execution gates; valid from assigned and in-progress work
+    // (Change 7 added the cleaner-driven in_progress state).
+    if (job.status !== "assigned" && job.status !== "in_progress") {
       throw workerError(WorkerErrorCode.JOB_STATE_INVALID, { status: job.status });
     }
 
     const res = await tx.query<JobRow>(
       `update public.jobs
-       set status = 'completed', completed_at = now(), updated_at = now()
+       set status = 'completed', completed_at = now(),
+           actual_end = coalesce(actual_end, now()), updated_at = now()
        where id = $1
        returning id, organization_id, branch_id, booking_id, job_number, status,
                  scheduled_start::text as scheduled_start, scheduled_end::text as scheduled_end,

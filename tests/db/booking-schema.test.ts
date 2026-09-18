@@ -398,15 +398,18 @@ describe("booking schema (migration 0011, Change 5 task 1.3)", () => {
       );
       expect(messaging.rows).toHaveLength(0);
 
-      // Workforce tables arrived in Change 6 (0012) — assert the exact set,
-      // proving Change 5 added none of them inside its own migrations.
+      // Workforce tables arrived in Change 6 (0012); the cleaner-execution
+      // checklist/media tables arrived in Change 7 (0013, BD-C3/C4) — assert
+      // the exact set, proving Change 5 added none of them itself.
       const workforce = await db.query<{ table_name: string }>(
         `select table_name from information_schema.tables
           where table_schema = 'public'
-            and (table_name like 'job%' or table_name like '%employee%' or table_name like '%assignment%')
+            and (table_name like 'job%' or table_name like '%employee%' or table_name like '%assignment%'
+                 or table_name like '%checklist%')
           order by table_name`,
       );
       expect(workforce.rows.map((r) => r.table_name)).toEqual([
+        "checklist_templates", // Change 7 (0013)
         "employee_availability",
         "employee_availability_exceptions",
         "employee_branches",
@@ -414,7 +417,10 @@ describe("booking schema (migration 0011, Change 5 task 1.3)", () => {
         "employee_skills",
         "employees",
         "job_assignments",
+        "job_checklist_items", // Change 7 (0013)
+        "job_checklist_snapshots", // Change 7 (0013)
         "job_events",
+        "job_media", // Change 7 (0013)
         "job_number_sequences",
         "jobs",
       ]);

@@ -1128,11 +1128,12 @@ describe.skipIf(!HOSTED)("hosted verification: create-booking", () => {
   it("09 BOUNDARY: Change 6 worker tables exist; no Change 7 execution/payment leakage (superseded by create-worker)", async () => {
     // Original Change 5 assertion (no worker tables) was superseded by
     // Change 6 (create-worker): jobs/employees/job_assignments now exist.
-    // The surviving boundary: no cleaner-execution or payment tables.
+    // Change 7 (create-cleaner-pwa): checklist tables are owned by 0013.
+    // The surviving boundary: no photo/payment/payroll tables.
     const rows = await sql<{ table_name: string }>(
       `select table_name from information_schema.tables
         where table_schema = 'public'
-          and (table_name like '%checklist%' or table_name like '%photo%'
+          and (table_name like '%photo%'
             or table_name like '%payment%' or table_name like '%payroll%')`,
     );
     expect(rows).toHaveLength(0);

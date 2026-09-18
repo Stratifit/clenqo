@@ -1464,6 +1464,21 @@ notifications
 > (BD-C8) · completion gates = checked-in + mandatory checklist complete +
 > no unresolved high/critical incident, manager override audited, idempotent,
 > booking transition only via the existing contract (BD-C9).
+>
+> **Implemented (Change 7, `create-cleaner-pwa`):** the execution surface is
+> live under `/cleaner` (Today / Tomorrow / Upcoming / Completed lists + job
+> detail) backed by Worker-owned server-authoritative contracts
+> (`features/worker/execution.ts`): enRoute → checkIn → startWork →
+> checklist updates → incident reporting → before/after/incident_evidence
+> media → checkOut → completion with BD-C9 gates evaluated transactionally
+> and deterministic `COMPLETION_BLOCKED` results; `assigned → checked_in`
+> remains permitted without en_route. Checklist templates are service-
+> scoped and versioned; job snapshots are immutable at execution start.
+> Media is private, job-scoped, signed-URL-only (BD-C4). The installable
+> PWA (manifest + service worker, app-shell caching only) includes the
+> lightweight idempotent offline action queue — no offline media, no
+> sensitive-data caching. Migration `0013_cleaner_execution.sql` adds the
+> execution timestamps, checklist structures, and `job_media`.
 
 ---
 

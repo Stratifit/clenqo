@@ -774,7 +774,9 @@ Continuous employee location tracking should not be assumed as a default feature
 > **no location data whatsoever** in V1 — no check-in or en-route coordinates,
 > no continuous or background tracking, and no location permission request.
 > Location verification may be reconsidered only after explicit legal/HR and
-> privacy review and a separate business decision.
+> privacy review and a separate business decision. **Verified in the
+> implemented Change 7:** no location columns, no location permissions, and
+> no location artifacts exist anywhere in the cleaner surface or schema.
 
 ---
 

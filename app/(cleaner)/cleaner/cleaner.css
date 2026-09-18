@@ -1,0 +1,54 @@
+/* Cleaner PWA surface styles (Change 7) — minimal, mobile-first.
+   Plain CSS (no @apply): the cleaner surface styles only need these few
+   primitives and avoid Tailwind's cross-file @reference requirement. */
+
+.cleaner-app {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cleaner-card {
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+
+.cleaner-btn {
+  display: block;
+  width: 100%;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+
+.cleaner-btn:active {
+  opacity: 0.8;
+}
+
+.cleaner-btn-primary {
+  background: #07742f;
+  color: #ffffff;
+}
+
+.cleaner-btn-secondary {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.cleaner-btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.cleaner-badge {
+  display: inline-block;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}

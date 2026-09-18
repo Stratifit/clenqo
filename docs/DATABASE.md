@@ -1445,9 +1445,24 @@ timezone (branch tz)
 required_skills (text[]; manual, BD-W11)
 job_snapshot (immutable jsonb)
 assignment_flag_reason (nullable; BD-W7b revalidation flag)
+en_route_at / checked_in_at / checked_out_at (nullable; Change 7 execution timestamps, BD-C2)
+actual_start / actual_end (nullable; Change 7 server-authoritative execution window)
 created_at
 updated_at
 ```
+
+> **Implemented (Change 7, migration `0013_cleaner_execution.sql`):** the
+> cleaner execution layer adds the `en_route_at` / `checked_in_at` /
+> `checked_out_at` / `actual_start` / `actual_end` execution timestamps
+> above, `checklist_templates` (service-scoped, versioned,
+> draft/published/retired) with immutable per-job `job_checklist_snapshots`
+> + `job_checklist_items` (status/completed_at/completed_by/notes — BD-C3),
+> and `job_media` (before/after/incident_evidence categories, private
+> job-scoped storage, incident linkage required for `incident_evidence`,
+> per-job+category+path deduplication — BD-C4). The `job_events` event
+> CHECK now also covers `en_route` and `checklist_completed` (BD-C2/C3).
+> All new tables carry full organization/branch RLS following the Change 6
+> model; cleaner access is bound to their own active assignment.
 
 Initially, a booking may produce one job.
 

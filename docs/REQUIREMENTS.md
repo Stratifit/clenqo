@@ -728,7 +728,10 @@ It should provide:
 > no delivery (BD-C7); **customer signature deferred** to a future
 > Quality/Booking decision (BD-C8); completion gated on check-in + mandatory
 > checklist + no unresolved high/critical incident, with audited manager
-> override (BD-C9).
+> override (BD-C9). **Implemented (Change 7, `create-cleaner-pwa`):** the
+> execution surface is live under `/cleaner` on migration
+> `0013_cleaner_execution.sql` with the BD-C boundaries enforced in code,
+> RLS, and tests.
 
 ---
 

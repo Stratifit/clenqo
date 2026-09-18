@@ -22,7 +22,9 @@ export type JobEventType =
   | "job_completed"
   | "job_cancelled"
   | "incident_reported"
-  | "assignment_flagged";
+  | "assignment_flagged"
+  | "en_route" // Change 7 (BD-C2)
+  | "checklist_completed"; // Change 7 (BD-C3)
 
 export type JobActorType = "staff" | "system" | "customer";
 

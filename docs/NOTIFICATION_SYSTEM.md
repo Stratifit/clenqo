@@ -249,7 +249,9 @@ Access must remain branch/role scoped.
 > updates). No delivery infrastructure (push/email/SMS/WhatsApp) and no second
 > notification engine are built in Change 7; delivery remains a future
 > Notification-domain capability using the employee's authorized contact
-> details per this section.
+> details per this section. **Implemented (Change 7):** the cleaner shell
+> reads in-app operational notifications derived from Worker event/outbox
+> intents; no delivery providers exist.
 
 ---
 

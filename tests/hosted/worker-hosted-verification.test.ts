@@ -497,8 +497,10 @@ describe.skipIf(!HOSTED)("hosted verification: create-worker", () => {
 
   it("04 JOB CREATION: confirmed booking → job (BD-W6), idempotent retry, JOB number (BD-W5), snapshot minimization", async () => {
     const ctx = await resolveActor(S.users.hq);
-    // Hold + confirm through the real flows.
-    const startIso = (() => { const d = new Date(Date.now() + 7 * 24 * 3600_000); d.setUTCMinutes(0, 0, 0); return d.toISOString(); })();
+    // Hold + confirm through the real flows. Pinned to a weekday 10:00 UTC
+    // (time-of-day independent; the original run-time-derived hour fell
+    // outside operating hours when the suite ran in the evening).
+    const startIso = (() => { const d = new Date(Date.now() + 7 * 24 * 3600_000); while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1); d.setUTCHours(10, 0, 0, 0); return d.toISOString(); })();
     const sessionId = `hv6-sess-${randomUUID()}`;
     const hold = await createSlotHold(
       ctx,
@@ -638,7 +640,7 @@ describe.skipIf(!HOSTED)("hosted verification: create-worker", () => {
     const forbidden = await sql<{ table_name: string }>(
       `select table_name from information_schema.tables where table_schema = 'public'
         and (table_name like '%payment%' or table_name like '%message%' or table_name like '%payroll%'
-             or table_name like '%conversation%' or table_name like '%checklist%' or table_name like '%photo%')`,
+             or table_name like '%conversation%' or table_name like '%photo%')`,
     );
     expect(forbidden).toHaveLength(0);
   });

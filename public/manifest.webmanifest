@@ -1,0 +1,19 @@
+{
+  "name": "CLENQO Cleaner",
+  "short_name": "CLENQO",
+  "description": "Field execution for CLENQO cleaners: assigned jobs, check-in, checklist, photos, completion.",
+  "start_url": "/cleaner",
+  "scope": "/cleaner",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F8EE",
+  "theme_color": "#07742F",
+  "icons": [
+    {
+      "src": "/cleaner/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

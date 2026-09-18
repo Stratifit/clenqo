@@ -1119,7 +1119,10 @@ unless operationally required.
 > Email, payment data, unrelated customer history, internal notes, and other
 > workers' information never reach the Cleaner PWA; access remains bound to
 > the cleaner's currently active assignment, and operational access ends when
-> the assignment is cancelled or reassigned.
+> the assignment is cancelled or reassigned. **Implemented (Change 7):** the
+> minimized view is produced by the Worker-owned `cleanerView` service over
+> the job snapshot + phone; RLS restricts cleaner reads to jobs with their
+> own active assignment (`tests/db/cleaner-rls.test.ts`).
 
 ---
 
