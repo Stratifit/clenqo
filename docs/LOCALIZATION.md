@@ -1186,6 +1186,12 @@ The cleaner PWA should localize:
 
 Operational data should remain structured.
 
+> **Resolved (BD-C1/C6 context — Change 7 decision record):** the cleaner PWA uses the existing
+> localization architecture; the employee's `preferred_language` is the
+> default cleaner UI language with the standard fallback rules, and dates and
+> times render in the branch-local timezone. Launch locales remain
+> de/en/fr/es.
+
 ---
 
 # 56. Localization in Emails

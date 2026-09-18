@@ -243,6 +243,14 @@ Cleaner notifications use the employee's authorized communication details.
 
 Access must remain branch/role scoped.
 
+> **Resolved (BD-C7 — Change 7 decision record):** Change 7 ships an **in-app**
+> cleaner notification surface consuming existing Worker event/outbox intents
+> (new assignment, reassignment, schedule change, job cancellation, incident
+> updates). No delivery infrastructure (push/email/SMS/WhatsApp) and no second
+> notification engine are built in Change 7; delivery remains a future
+> Notification-domain capability using the employee's authorized contact
+> details per this section.
+
 ---
 
 # 14. Notification Templates

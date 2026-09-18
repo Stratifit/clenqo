@@ -770,6 +770,12 @@ The platform should:
 
 Continuous employee location tracking should not be assumed as a default feature.
 
+> **Resolved (BD-C6 — Change 7 decision record):** the Cleaner PWA captures
+> **no location data whatsoever** in V1 — no check-in or en-route coordinates,
+> no continuous or background tracking, and no location permission request.
+> Location verification may be reconsidered only after explicit legal/HR and
+> privacy review and a separate business decision.
+
 ---
 
 # 42. Job Photos

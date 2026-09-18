@@ -697,6 +697,11 @@ Operational photos should have a defined retention policy.
 
 Do not retain them indefinitely without business justification.
 
+> **Resolved (BD-C4 — Change 7 decision record):** V1 cleaner photos are
+> limited to before/after/incident-evidence categories, private and job-scoped,
+> with a defined retention policy configured through the Media Storage
+> implementation; no public exposure path exists.
+
 ---
 
 # 54. Customer Personal Data
@@ -937,6 +942,11 @@ Access should be restricted according to role and operational necessity.
 # 75. Employee Data Minimization
 
 The cleaner PWA should receive only the data required to perform assigned work.
+
+> **Resolved (BD-C1 — Change 7 decision record):** the concrete V1 field set is
+> customer first name, last initial, phone, service address, and execution
+> instructions — nothing else crosses into the Cleaner PWA (no email, no
+> payment data, no unrelated history, no internal notes).
 
 ---
 

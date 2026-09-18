@@ -571,6 +571,13 @@ Job detail should provide:
 * evidence;
 * incident reporting.
 
+> **Resolved (BD-C1…BD-C9 — Change 7 decision record):** the Cleaner PWA scope
+> above proceeds with no GPS/location capture, no customer signature, an
+> in-app-only notification surface (delivery deferred), a lightweight offline
+> action queue, before/after/incident photos only, and completion gates
+> (check-in + mandatory checklist + no unresolved high/critical incident with
+> audited manager override).
+
 ---
 
 # 22. Manual Assignment First

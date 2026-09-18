@@ -717,6 +717,19 @@ It should provide:
 * Incident reporting
 * Completion status
 
+> **Resolved (BD-C1…BD-C9 — Change 7 decision record, 2026-09):** the Cleaner
+> PWA requirement list above is confirmed with these boundaries: minimized
+> customer data only (first name, last initial, phone, address, execution
+> instructions — BD-C1); `en_route` included (BD-C2); service-defined checklist
+> copied into an immutable job snapshot at execution start (BD-C3); photos
+> limited to before/after/incident-evidence, private and job-scoped (BD-C4);
+> lightweight offline action queue for idempotent execution actions (BD-C5);
+> **no GPS/location capture** (BD-C6); **in-app** notification surface only,
+> no delivery (BD-C7); **customer signature deferred** to a future
+> Quality/Booking decision (BD-C8); completion gated on check-in + mandatory
+> checklist + no unresolved high/critical incident, with audited manager
+> override (BD-C9).
+
 ---
 
 # 18. Scheduling Requirements

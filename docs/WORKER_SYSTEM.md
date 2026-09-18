@@ -514,6 +514,22 @@ private administrative information
 
 The PWA should expose only operationally necessary data.
 
+> **Resolved (BD-C1 — Change 7 decision record):** the cleaner-visible customer
+> field set is exactly: **customer first name, last initial, phone number,
+> service address, and the cleaning/property instructions required for
+> execution** (the phone is the documented operational contact field,
+> SECURITY.md §46). The cleaner must NOT see: customer email, payment
+> information or payment history, booking history beyond the assigned job,
+> internal staff notes, unrelated customer information, or other workers'
+> information. The Change 6 minimized `customer_display` job snapshot remains
+> the foundation, extended only with the phone number. **History visibility:**
+> the cleaner's V1 job history may list completed jobs previously assigned to
+> them, always limited to the same minimized snapshot. **Cancelled/reassigned
+> jobs:** the cleaner retains operational access only while an assignment is
+> active; after reassignment or cancellation the job disappears from the
+> operational surface (historical records exist only in the manager/audit
+> surfaces). Access remains limited to currently authorized jobs/assignments.
+
 ---
 
 # 31. Navigation
@@ -538,13 +554,18 @@ Possible data:
 checked_in_at
 ```
 
-The system may optionally capture:
-
-```text
-location verification
-```
-
-if legally and operationally appropriate.
+> **Resolved (BD-C2, BD-C6 — Change 7 decision record):** the execution flow is
+> `assigned → en_route → checked_in → in_progress → completed` with an explicit
+> cleaner "On my way" (`en_route`) action — only the currently assigned cleaner
+> may trigger it, the server is authoritative, the action is idempotent, and
+> `en_route` is not a prerequisite for assignment or a hard gate for check-in
+> (a direct `assigned → checked_in` remains permitted when the Worker
+> transition contract allows it). Server-authoritative `en_route_at` is
+> recorded. **No GPS/location capture exists in V1**: no check-in or en-route
+> coordinates, no continuous/background tracking, no location permission
+> request — the PWA works fully without location access. Location verification
+> may be reconsidered only after explicit legal/privacy review and a separate
+> business decision (LEGAL_COMPLIANCE §40–41).
 
 Location tracking must not be introduced unnecessarily.
 
@@ -616,6 +637,19 @@ job type
 
 The checklist should be generated when the job starts rather than dynamically changing historical requirements during execution.
 
+> **Resolved (BD-C3 — Change 7 decision record):** V1 uses a **service-level
+> checklist definition copied into a job-specific immutable checklist snapshot
+> when execution begins** (Service Checklist Definition → job starts → Job
+> Checklist Snapshot → items → cleaner completes items). Item completion
+> records status, `completed_at`, `completed_by`, and optional notes;
+> historical checklist state is immutable after completion and never changes
+> retroactively when service configuration changes. Checklist templates are
+> versionable. There is no arbitrary customer-facing checklist editor in
+> Change 7, and branch/service-specific checklist configuration respects the
+> existing branch/service ownership boundaries. No production checklist items
+> are invented or seeded in Change 7. Mandatory items gate completion only per
+> §51/BD-C9.
+
 ---
 
 # 38. Checklist Completion
@@ -646,6 +680,18 @@ damage
 quality evidence
 incident
 ```
+
+> **Resolved (BD-C4 — Change 7 decision record):** V1 enables exactly three
+> categories — **before**, **after**, and **incident-evidence** photos. Damage
+> and quality-evidence capture remain disabled until a later decision. Photos
+> are private by default, job-scoped, authorized through the Worker/Cleaner
+> access model, and served only via short-lived signed URLs after
+> authorization (MEDIA_STORAGE §27/§32). No public URLs, no customer-visible
+> gallery; customer exposure of selected photos remains a future,
+> explicitly-classified feature (§42). Size/type limits are configured through
+> the Media Storage implementation (per-category allow-lists), not invented as
+> arbitrary values; the bucket name is finalized during implementation as
+> MEDIA_STORAGE §10 anticipates.
 
 Photos should be stored securely in Supabase Storage.
 
@@ -821,6 +867,17 @@ Before completion, the system may require:
 
 Requirements should be service/branch configurable.
 
+> **Resolved (BD-C9 — Change 7 decision record):** V1 completion gates are:
+> 1) the cleaner must have checked in before completing the job; 2) mandatory
+> checklist items must be completed; 3) an unresolved **high or critical**
+> incident blocks cleaner self-completion (low/medium incidents do not block);
+> 4) authorized management may resolve or override blockers through an
+> explicit, server-authoritative, audited action; 5) the cleaner never
+> transitions Booking state directly — successful job completion invokes the
+> existing Worker → Booking transition contract; 6) completion timestamps are
+> server-authoritative; 7) completion is idempotent. Blocked completion is a
+> validation rule, not a new job state.
+
 ---
 
 # 52. Completing a Job
@@ -984,6 +1041,12 @@ The cleaner should receive notifications for:
 
 The notification engine owns delivery.
 
+> **Resolved (BD-C7 — Change 7 decision record):** Change 7 ships an **in-app**
+> notification surface only. Notification intents continue to originate from
+> the Worker event/outbox system; no push, email, SMS, or WhatsApp delivery is
+> implemented in Change 7 and no second notification engine is created. Push
+> delivery remains a future Notification-domain capability.
+
 ---
 
 # 62. Offline Resilience
@@ -1004,6 +1067,20 @@ should be designed to avoid accidental data loss.
 ---
 
 # 63. Offline Strategy
+
+> **Resolved (BD-C5 — Change 7 decision record):** V1 uses a **lightweight
+> offline action queue**, not a full offline-first application. Only idempotent
+> execution actions may be queued locally (en_route, check-in, start work,
+> checklist item updates, incident creation, and check-out/completion where
+> technically safe); queued actions replay when connectivity returns and the
+> server remains authoritative — stale or conflicting replays receive
+> deterministic server responses, and duplicate replays never duplicate
+> events, incidents, or checklist updates. No authoritative job state lives
+> only on-device, unrestricted offline browsing is not promised, and offline
+> media upload is out of scope for V1 (photos may require connectivity). When
+> an action cannot be safely queued, the UI shows an explicit pending/error
+> state. The design must allow increasing offline complexity later without
+> replacing the Worker domain.
 
 The initial implementation may use a lightweight approach:
 
@@ -1370,6 +1447,23 @@ job completion
 booking completion
 notifications
 ```
+
+> **Change 7 decision record (BD-C1…BD-C9, resolved 2026-09):** the Cleaner
+> Execution PWA implements this MVP scope with the following resolved
+> boundaries — minimized customer data (first name, last initial, phone,
+> service address, execution instructions; no email/payment/internal notes;
+> BD-C1) · `en_route` included as a cleaner action with server-authoritative
+> `en_route_at` (BD-C2) · service-defined checklist copied into an immutable
+> job snapshot at execution start, versionable templates, no seeded content
+> (BD-C3) · before/after/incident-evidence photos only, private, job-scoped,
+> signed-URL access (BD-C4) · lightweight offline action queue for idempotent
+> execution actions, never full offline-first (BD-C5) · **no GPS/location
+> capture whatsoever** (BD-C6) · in-app notification surface consuming
+> existing event/outbox intents, no delivery infrastructure (BD-C7) ·
+> **customer signature deferred** to a future Quality/Booking decision
+> (BD-C8) · completion gates = checked-in + mandatory checklist complete +
+> no unresolved high/critical incident, manager override audited, idempotent,
+> booking transition only via the existing contract (BD-C9).
 
 ---
 

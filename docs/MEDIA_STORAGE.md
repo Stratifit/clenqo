@@ -637,6 +637,13 @@ A signed URL should:
 
 Possession of a signed URL should be treated as sensitive.
 
+> **Resolved (BD-C4 — Change 7 decision record):** the Cleaner PWA (Change 7)
+> uses exactly this model for its V1 photo categories (before / after /
+> incident-evidence): private bucket, job-scoped paths, per-category
+> size/type allow-lists configured in the Media Storage implementation,
+> short-lived signed URLs generated only after Cleaner-scope authorization,
+> and no public exposure path. Offline photo upload is out of scope for V1.
+
 ---
 
 # 33. Server-Mediated Access

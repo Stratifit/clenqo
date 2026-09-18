@@ -1112,6 +1112,15 @@ internal notes
 
 unless operationally required.
 
+> **Resolved (BD-C1 — Change 7 decision record):** the cleaner-visible customer
+> field set is fixed as customer first name, last initial, phone number,
+> service address, and execution instructions — implemented through the
+> minimized `customer_display` job snapshot (extended only with the phone).
+> Email, payment data, unrelated customer history, internal notes, and other
+> workers' information never reach the Cleaner PWA; access remains bound to
+> the cleaner's currently active assignment, and operational access ends when
+> the assignment is cancelled or reassigned.
+
 ---
 
 # 47. Internal Notes

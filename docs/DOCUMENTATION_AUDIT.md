@@ -326,6 +326,52 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 ---
 
+# 4b. Change 7 Cleaner PWA — business decision record (2026-09, BD-C1–BD-C9)
+
+* **Scope:** resolutions for the Cleaner Execution PWA (Change 7), taken after
+  the readiness audit; recorded in place across `WORKER_SYSTEM.md` (§30, §32,
+  §37, §39, §51, §61, §63, §85), `SECURITY.md` §46, `SECURITY_PRIVACY.md`
+  §53/§75, `MEDIA_STORAGE.md` §32, `LEGAL_COMPLIANCE.md` §41,
+  `LOCALIZATION.md` §55, `NOTIFICATION_SYSTEM.md` §13, `REQUIREMENTS.md` §17,
+  `ROADMAP.md` §21.
+* **BD-C1 Cleaner-visible customer data:** exactly first name, last initial,
+  phone, service address, execution instructions (Change 6 `customer_display`
+  snapshot + phone); never email, payment data, unrelated history, internal
+  notes, or other workers' information; access bound to the active assignment;
+  completed-job history stays minimized; cancelled/reassigned jobs leave the
+  operational surface.
+* **BD-C2 en_route:** included in V1 as a cleaner-triggered, server-
+  authoritative, idempotent action with `en_route_at`; not a prerequisite for
+  assignment; direct `assigned → checked_in` remains allowed by the Worker
+  transition contract.
+* **BD-C3 Checklist model:** service-level definition copied into an immutable
+  job checklist snapshot at execution start; item completion records
+  status/completed_at/completed_by/notes; templates versionable; no production
+  seed content; no customer-facing editor.
+* **BD-C4 Photo scope:** before/after/incident-evidence only; private by
+  default, job-scoped, signed-URL access; limits via Media Storage
+  configuration; bucket name finalized during implementation.
+* **BD-C5 Offline depth:** lightweight offline action queue for idempotent
+  execution actions; server authoritative; deterministic stale/conflict
+  responses; no offline media upload; no full offline-first architecture.
+* **BD-C6 GPS/location:** none in V1 — no coordinates, no tracking, no
+  location permission; revisit only after legal/HR/privacy review and a
+  separate decision.
+* **BD-C7 Notification surface:** in-app only, consuming existing event/outbox
+  intents; no push/email/SMS/WhatsApp delivery; no second notification engine.
+* **BD-C8 Customer signature:** deferred to a future Quality/Booking decision;
+  nothing captured, stored, or gated in Change 7.
+* **BD-C9 Completion gates:** check-in required + mandatory checklist items
+  complete + no unresolved high/critical incident; low/medium incidents do not
+  block; audited server-authoritative manager override; completion idempotent;
+  Booking transitions only via the existing Worker → Booking contract; no new
+  job state for blocked completion.
+* **Status:** RESOLVED — no contradiction found with the Worker/Booking
+  capability specs, the security/RLS model, or the Media Storage
+  architecture. Change 7 is unblocked for OpenSpec authoring.
+
+---
+
 # 5. Medium Findings
 
 ## MEDIUM-1 — Notification event vocabulary drift
