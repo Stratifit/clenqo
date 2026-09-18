@@ -388,15 +388,36 @@ describe("booking schema (migration 0011, Change 5 task 1.3)", () => {
     });
   });
 
-  it("keeps NO jobs, employees, assignment, or messaging tables (TD-1/B-NEW-1)", async () => {
+  it("keeps NO messaging tables (B-NEW-1); Change 5 introduced no workforce tables either — Change 6 (0012) owns those", async () => {
     await withFreshDb(async (db) => {
-      const res = await db.query<{ table_name: string }>(
+      // Change 5 boundary, restated: NO messaging/conversation tables ever.
+      const messaging = await db.query<{ table_name: string }>(
         `select table_name from information_schema.tables
           where table_schema = 'public'
-            and (table_name like 'job%' or table_name like '%employee%'
-                 or table_name like '%assignment%' or table_name like '%message%')`,
+            and (table_name like '%message%' or table_name like '%conversation%')`,
       );
-      expect(res.rows).toHaveLength(0);
+      expect(messaging.rows).toHaveLength(0);
+
+      // Workforce tables arrived in Change 6 (0012) — assert the exact set,
+      // proving Change 5 added none of them inside its own migrations.
+      const workforce = await db.query<{ table_name: string }>(
+        `select table_name from information_schema.tables
+          where table_schema = 'public'
+            and (table_name like 'job%' or table_name like '%employee%' or table_name like '%assignment%')
+          order by table_name`,
+      );
+      expect(workforce.rows.map((r) => r.table_name)).toEqual([
+        "employee_availability",
+        "employee_availability_exceptions",
+        "employee_branches",
+        "employee_number_sequences",
+        "employee_skills",
+        "employees",
+        "job_assignments",
+        "job_events",
+        "job_number_sequences",
+        "jobs",
+      ]);
     });
   });
 });

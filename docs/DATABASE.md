@@ -108,7 +108,8 @@ For example:
 
 ```text
 bookings.branch_id
-employees.branch_id
+employee_branches.branch_id (BD-W1: employees authorize via the
+  many-to-many join, not a scalar employees.branch_id)
 services.branch_id
 pricing_profiles.branch_id
 reviews.branch_id
@@ -1254,28 +1255,57 @@ Suggested fields:
 ```text
 id
 organization_id
-branch_id
-user_id
-employee_number
-employment_type
-status
+user_id (nullable — BD-W12: app access optional, Auth domain owned)
+employee_number (EMP-<year>-<seq>, organization-wide monotonic)
+first_name / last_name / email / phone
+employment_type (CHECK: full_time | part_time | minijob | flexible — BD-W3)
+status (CHECK: active | temporarily_unavailable | on_leave | inactive — BD-W2)
 hire_date
 termination_date
 created_at
 updated_at
 ```
 
-Employment types may include:
+> **Implemented (Change 6, migration `0012_worker.sql`):** branch
+> authorization is the many-to-many `employee_branches` join table (BD-W1);
+> `employees` intentionally has **no** scalar `branch_id` authorization
+> column. `on_call` is not a V1 employment type (BD-W3).
+
+Employment types (canonical V1, BD-W3):
 
 ```text
 full_time
 part_time
 minijob
 flexible
-on_call
+```
+
+Employee statuses (canonical V1, BD-W2):
+
+```text
+active
+temporarily_unavailable
+on_leave
+inactive
 ```
 
 The schema must remain extensible.
+
+## 23.2 `employee_branches`
+
+Authoritative employee-to-branch authorization (BD-W1, implemented in
+`0012_worker.sql`):
+
+```text
+id
+employee_id (FK employees, ON DELETE CASCADE)
+branch_id (FK branches)
+created_at
+UNIQUE (employee_id, branch_id)
+```
+
+An employee may be authorized for one or more branches; RLS and assignment
+validation derive operational branch eligibility from this table.
 
 ---
 
@@ -1283,14 +1313,30 @@ The schema must remain extensible.
 
 ## 24.1 `employee_skills`
 
+> **Implemented (Change 6, migration `0012_worker.sql`, BD-W11):**
+> organization-wide `skill_key` strings; **no** skills registry table in V1;
+> no branch-specific vocabularies. `level` exists but carries no V1
+> semantics (reserved). Qualification metadata lives on the employee-skill
+> relationship: `qualification_status`, `qualification_date`,
+> `expiry_date`. Expired mandatory qualifications do not satisfy new
+> assignment requirements; historical assignments are unaffected. Job-side
+> requirements use `jobs.required_skills` (string array), set manually by
+> authorized staff (`jobs.manage`/`jobs.assign`); employee-skill
+> administration is `employees.manage`. Skills are validated at assignment
+> time only and never affect Scheduling availability/capacity in V1.
+
 Suggested fields:
 
 ```text
 id
 employee_id
 skill_key
-level
+level (reserved, no V1 semantics)
+qualification_status
+qualification_date
+expiry_date
 created_at
+UNIQUE (employee_id, skill_key)
 ```
 
 Examples:
@@ -1308,6 +1354,15 @@ This can later support intelligent assignment.
 
 # 25. Employee Availability
 
+> **Implemented (Change 6, migration `0012_worker.sql`, TD-W6):** recurring
+> weekday windows plus date exceptions, interpreted in the **branch
+> timezone**. `employee_availability_exceptions` supports `exception_type`
+> CHECK (`available | unavailable`) — `available` widens coverage beyond the
+> recurring schedule, `unavailable` hard-blocks assignment eligibility.
+> Availability feeds **assignment eligibility only** (BD-W13): it is not a
+> Scheduling capacity input in V1, and skills never affect availability
+> calculation (Scheduling S8 boundary preserved).
+
 ## 25.1 `employee_availability`
 
 Suggested fields:
@@ -1315,21 +1370,19 @@ Suggested fields:
 ```text
 id
 employee_id
-day_of_week
-start_time
-end_time
-status
-effective_from
-effective_until
+weekday (0–6, 0 = Sunday, branch-local)
+start_time / end_time (local wall clock, start < end)
+effective_from / effective_until
 created_at
 updated_at
+UNIQUE (employee_id, weekday, start_time, effective_from)
 ```
 
 ---
 
 ## 25.2 Availability Exceptions
 
-A separate exception model may be used for:
+A separate exception model is used for (implemented in `0012_worker.sql`):
 
 * holidays
 * vacation
@@ -1337,13 +1390,17 @@ A separate exception model may be used for:
 * unavailable dates
 * special working days
 
-Example table:
+Table:
 
 ```text
 employee_availability_exceptions
+id
+employee_id
+exception_type (CHECK: available | unavailable)
+start_at / end_at (timestamptz)
+reason
+created_at
 ```
-
-The scheduling engine must consider both recurring availability and exceptions.
 
 ---
 
@@ -1355,20 +1412,39 @@ A job represents the operational work.
 
 ## 26.1 `jobs`
 
+> **Implemented (Change 6, migration `0012_worker.sql`, BD-W4/W5/W6/W7):**
+> jobs are created **post-commit** from confirmed bookings, idempotent and
+> retry-safe (a partial UNIQUE on `booking_id` enforces one Job per confirmed
+> Booking in V1 while staying extensible to future multi-Job bookings —
+> BD-W4). Human-readable `JOB-<year>-<sequence>` numbers (BD-W5) come from a
+> single organization-wide monotonic `job_number_sequences` row (row-locked,
+> never reused, never resets yearly); the year renders from the source
+> booking's branch-local `scheduled_start`. An immutable `job_snapshot`
+> (BD-W7a) carries booking/service/address/instruction data with a minimized
+> customer display (first name + last initial). Status CHECK
+> `pending | assigned | en_route | checked_in | in_progress | completed |
+> cancelled` guarded by a transition trigger; `job_events` is append-only
+> (update/delete denied by trigger). Cross-domain effects flow through the
+> explicit BD-W7 contracts: assignment → Booking `assigned`, check-in/start
+> → `in_progress`, completion → `completed` (Booking-owned contract),
+> reschedule → interval update + assignment revalidation (BD-W7b),
+> cancellation → Job cancelled + assignments released, never deleted
+> (BD-W7c), `no_show` → Job cancelled + `no_show` incident (BD-W7d).
+
 Suggested fields:
 
 ```text
 id
-booking_id
+organization_id
 branch_id
-status
-scheduled_start
-scheduled_end
-actual_start
-actual_end
-instructions
-checklist
-completion_notes
+booking_id (nullable FK; partial UNIQUE one-per-booking, BD-W4)
+job_number (org-wide UNIQUE, BD-W5)
+status (see lifecycle above)
+scheduled_start / scheduled_end (timestamptz)
+timezone (branch tz)
+required_skills (text[]; manual, BD-W11)
+job_snapshot (immutable jsonb)
+assignment_flag_reason (nullable; BD-W7b revalidation flag)
 created_at
 updated_at
 ```
@@ -1381,28 +1457,34 @@ The model should still allow future bookings to generate multiple jobs.
 
 # 27. Job Assignments
 
+> **Implemented (Change 6, migration `0012_worker.sql`, BD-W8/W9):** a
+> partial UNIQUE index enforces **at most one non-terminal assignment per
+> Job at commit**; V1 uses immediate `active` assignment (no cleaner
+> acceptance gate — `accepted`/`declined` remain reserved for a future
+> workflow). Reassignment is manager-controlled: the prior assignment is
+> cancelled in place and history is preserved. Assignments are transactional,
+> server-authoritative, idempotent, and validated (branch authorization,
+> status, skills/qualification validity, availability, global cross-branch
+> interval conflict — BD-W13) before commit.
+
 ## 27.1 `job_assignments`
 
 Suggested fields:
 
 ```text
 id
+organization_id
+branch_id
 job_id
+customer_id (denormalized for RLS self-scope)
 employee_id
-assignment_status
+assignment_status (active | pending | accepted | declined | completed | cancelled)
 assigned_at
-accepted_at
-declined_at
+accepted_at (reserved, BD-W9)
+declined_at (reserved, BD-W9)
 created_at
 updated_at
 ```
-
-This allows:
-
-* manual assignment
-* automatic assignment
-* reassignment
-* multiple cleaners per job
 
 ---
 
@@ -1424,6 +1506,14 @@ Photos and documents should be represented through media records rather than emb
 
 # 29. Job Incidents
 
+> **Implemented (Change 6, migration `0012_worker.sql`, BD-W7d):** the
+> minimal incident model required for `no_show` — a Booking `no_show`
+> cancels its Job and records a `no_show` incident. Broader incident types,
+> resolution workflow, and quality management belong to the future Quality
+> change. Type CHECK (`no_show | other`), severity CHECK
+> (`low | medium | high`), notes, actor, and timestamps are captured;
+> historical records are never deleted.
+
 ## 29.1 `incidents`
 
 Suggested fields:
@@ -1442,18 +1532,6 @@ status
 resolution
 created_at
 resolved_at
-```
-
-Examples:
-
-```text
-property_damage
-access_problem
-customer_issue
-cleaner_issue
-safety_issue
-late_arrival
-no_show
 ```
 
 ---
@@ -1866,8 +1944,9 @@ booking_items.booking_id
 booking_events.booking_id
 booking_events.created_at
 
-employees.branch_id
-employees.user_id
+employee_branches.employee_id
+employee_branches.branch_id (BD-W1)
+employees.user_id (nullable, BD-W12)
 employees.status
 
 jobs.branch_id
@@ -1925,7 +2004,8 @@ Examples:
 ```text
 branches.status = archived
 services.status = archived
-employees.status = terminated
+employees.status = inactive (BD-W2: canonical V1 value; blocks new
+  assignments while preserving all historical records)
 ```
 
 Financial and operational history should generally remain immutable.
@@ -2732,6 +2812,65 @@ recorded in `openspec/changes/create-booking/design.md`). Field-level facts:
   the Worker change will create jobs idempotently from confirmed bookings.
   Committed bookings occupy scheduling capacity via the `bookings` table
   (TD-3.1) until jobs exist.
+
+The workforce entities above are **implemented** by migration
+`0012_worker.sql` (Change 6; owner decisions BD-W1–BD-W13, technical
+decisions TD-W1–TD-W10, recorded in
+`openspec/changes/create-worker/design.md`). Field-level facts:
+
+* `employees` / `employee_branches` (BD-W1): many-to-many branch
+  authorization — no scalar `employees.branch_id`; `employees.user_id` is a
+  nullable link to the Auth user (BD-W12); status CHECK (`active |
+  temporarily_unavailable | on_leave | inactive`, BD-W2) and employment-type
+  CHECK (`full_time | part_time | minijob | flexible`, BD-W3); per-
+  organization monotonic `EMP-<yy><seq>`-style numbers via
+  `employee_number_sequences` (row-locked allocation).
+* `employee_skills` (BD-W11): organization-wide `skill_key` strings (no
+  registry table in V1) plus qualification metadata (`qualification_status`,
+  `qualification_date`, `expiry_date`); `level` is reserved with no V1
+  semantics; expired mandatory qualifications fail assignment validation.
+* `employee_availability` / `employee_availability_exceptions` (TD-W6):
+  recurring weekday windows (`start_time` < `end_time`, effective-dated) and
+  date exceptions (`available` widens, `unavailable` blocks); interpreted in
+  the branch timezone.
+* `jobs` + `job_number_sequences` (BD-W4/W5/W6): one Job per confirmed
+  Booking (partial UNIQUE on `booking_id` — extensible to future multi-Job),
+  created post-commit by the Worker domain, idempotent and retry-safe;
+  organization-wide `JOB-<year>-<sequence>` numbers from a single monotonic
+  per-organization sequence that never resets yearly (year rendered from the
+  source booking's branch-local `scheduled_start`); immutable
+  `job_snapshot` (BD-W7a) carries booking/service/address/customer-display
+  data with a minimized customer display (first name + last initial);
+  `required_skills` string array set manually by authorized staff; status
+  CHECK (`pending | assigned | en_route | checked_in | in_progress |
+  completed | cancelled`) guarded by a transition trigger; 8-state booking
+  lifecycle mapping unchanged (TD-W4 contracts: assignment → Booking
+  `assigned`, check-in/start → `in_progress`, completion → `completed` via
+  the Booking-owned transition contract; reschedule/cancel/no_show propagate
+  through the Worker-owned contracts BD-W7b/c/d).
+* `job_assignments` (BD-W8/W9): structurally multi-row; a partial UNIQUE
+  index enforces at most one non-terminal (`active | pending`) assignment
+  per Job at commit; V1 uses immediate active assignment (no cleaner
+  acceptance gate; `accepted`/`declined` reserved for a future workflow);
+  reassignment cancels the prior assignment in place — history preserved;
+  global cross-branch interval conflict checks (BD-W13).
+* `job_events`: append-only (update/delete denied by trigger) with types for
+  creation, assignment, reassignment, reschedule, lifecycle transitions,
+  cancellation, incident.
+* `incidents`: minimal incident records required by BD-W7d — a Booking
+  `no_show` cancels the Job and records a `no_show` incident (type CHECK
+  `no_show | other`, severity CHECK `low | medium | high`, notes, actor,
+  resolved workflow deferred to the Quality change).
+* `notification_outbox` extension: `booking_id` is now nullable and the
+  event-type CHECK accepts worker events (`job_created`, `job_assigned`,
+  `job_reassigned`, `job_cancelled`) — Change 5 booking events unchanged;
+  delivery still deferred.
+* Scheduling occupancy (BD-W13/TD-W10): the speculative Change 3 `jobs`
+  occupancy probe is removed; **bookings remain the single authoritative
+  occupancy source**, so Jobs/assignments never double-count. Branch
+  concurrency cap unchanged (default 3); workforce data is not a Scheduling
+  capacity input in V1 — skills/status/availability are assignment-time
+  validation only.
 
 Payments, invoices, notifications, reviews, advanced workforce scheduling, and advanced quality systems can follow after the operational foundation is stable.
 

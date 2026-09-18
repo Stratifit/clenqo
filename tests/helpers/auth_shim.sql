@@ -47,7 +47,14 @@ $$;
 -- Hosted Supabase grants SELECT to anon/authenticated on public tables;
 -- replicate so RLS policies (not missing grants) are the effective gate.
 -- Grants require the tables to exist, hence post-migration.
+-- auth.uid()/auth.role() (created in the pre-migration piece, owned by the
+-- pglite superuser) must be executable by the application roles — hosted
+-- Supabase grants the same on its auth functions.
 
 grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to authenticated;
 grant select on all tables in schema public to anon;
+
+grant usage on schema auth to anon, authenticated;
+grant execute on function auth.uid() to anon, authenticated;
+grant execute on function auth.role() to anon, authenticated;

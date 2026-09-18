@@ -386,7 +386,13 @@ describe.skipIf(!HOSTED)("hosted verification: create-booking", () => {
             or (table_name='notification_outbox' and column_name in ('booking_id','event_type','status')))`,
     );
     for (const col of nullables) {
-      expect(col.is_nullable, `${col.table_name}.${col.column_name}`).toBe("NO");
+      // Change 6 (0012) made outbox.booking_id nullable for worker events
+      // that are not booking-scoped; Change 5 semantics otherwise unchanged.
+      if (col.table_name === "notification_outbox" && col.column_name === "booking_id") {
+        expect(col.is_nullable, "notification_outbox.booking_id (0012 relaxed)").toBe("YES");
+      } else {
+        expect(col.is_nullable, `${col.table_name}.${col.column_name}`).toBe("NO");
+      }
     }
     expect(nullables.length).toBeGreaterThanOrEqual(20);
 
@@ -1119,10 +1125,15 @@ describe.skipIf(!HOSTED)("hosted verification: create-booking", () => {
 
   // -- 09) TD-1 boundary: no jobs/employees leakage ---------------------------
 
-  it("09 BOUNDARY: no jobs/employees tables created by Change 5 (TD-1)", async () => {
+  it("09 BOUNDARY: Change 6 worker tables exist; no Change 7 execution/payment leakage (superseded by create-worker)", async () => {
+    // Original Change 5 assertion (no worker tables) was superseded by
+    // Change 6 (create-worker): jobs/employees/job_assignments now exist.
+    // The surviving boundary: no cleaner-execution or payment tables.
     const rows = await sql<{ table_name: string }>(
       `select table_name from information_schema.tables
-        where table_schema = 'public' and table_name in ('jobs','employees','job_assignments')`,
+        where table_schema = 'public'
+          and (table_name like '%checklist%' or table_name like '%photo%'
+            or table_name like '%payment%' or table_name like '%payroll%')`,
     );
     expect(rows).toHaveLength(0);
   });

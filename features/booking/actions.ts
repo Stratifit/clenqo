@@ -21,6 +21,11 @@ import { fail, ok, toAppError, type Result } from "@/lib/errors";
 import { query } from "@/lib/db/server";
 import { AppError, ErrorCode } from "@/lib/errors";
 import { confirmBooking, cancelBooking, overrideCancellationFee, rescheduleBooking, loadBookingForActor } from "./service";
+import {
+  ensureJobForBooking,
+  propagateRescheduleToJob,
+  propagateCancellationToJob,
+} from "@/features/worker/jobs";
 import { issueMagicLink, verifyMagicLink, requireCustomerSession, type CustomerSession } from "./magicLink";
 import {
   createCancellationPolicy,
@@ -57,6 +62,22 @@ function run<T>(fn: (ctx: AuthContext) => Promise<T>): Promise<Result<T>> {
   })();
 }
 
+/**
+ * BD-W6/W7 guard: Worker-side propagation failure must never fail the
+ * already-committed booking operation. The failure is logged (structured,
+ * correlation-ready per OBSERVABILITY §9) and the operation converges on
+ * the next invocation/retry.
+ */
+async function safeWorkerPropagation(fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    console.error("[worker-contract] post-commit propagation failed (retryable)", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Internal — booking operations
 // ---------------------------------------------------------------------------
@@ -83,16 +104,36 @@ export async function staffCancelBookingAction(input: {
 }): Promise<Result<CancellationOutcome>> {
   return run(async (ctx) => {
     const outcome = await cancelBooking(ctx, input);
+    // BD-W7c: post-commit booking→job cancellation propagation. A worker
+    // failure must not fail the booking cancellation (the booking event is
+    // authoritative; job convergence is retry-safe on next invocation).
+    await safeWorkerPropagation(() => propagateCancellationToJob(input.booking_id, input.reason ?? "booking_cancelled"));
     return outcome;
   });
 }
 
-export async function staffRescheduleBookingAction(input: unknown): Promise<Result<RescheduleOutcome>> {
-  return run((ctx) => rescheduleBooking(ctx, input));
+export async function staffRescheduleBookingAction(input: {
+  booking_id: string;
+  [key: string]: unknown;
+}): Promise<Result<RescheduleOutcome>> {
+  return run(async (ctx) => {
+    const outcome = await rescheduleBooking(ctx, input);
+    // BD-W7b: same job, interval updated, assignment retained+revalidated.
+    await safeWorkerPropagation(() =>
+      propagateRescheduleToJob(input.booking_id, outcome.booking.scheduled_start, outcome.booking.scheduled_end),
+    );
+    return outcome;
+  });
 }
 
 export async function staffCreateBookingAction(input: unknown): Promise<Result<ConfirmationResult>> {
-  return run((ctx) => confirmBooking(ctx, input));
+  return run(async (ctx) => {
+    const result = await confirmBooking(ctx, input);
+    // BD-W6: job creation happens immediately AFTER the confirmation
+    // transaction commits; a failure never rolls back the booking.
+    await safeWorkerPropagation(() => ensureJobForBooking(result.booking.id));
+    return result;
+  });
 }
 
 export async function overrideCancellationFeeAction(input: unknown): Promise<Result<BookingRow>> {
@@ -191,6 +232,8 @@ export async function deleteCustomerAddressAction(addressId: string): Promise<Re
 export async function confirmPublicBookingAction(input: unknown): Promise<Result<ConfirmationResult>> {
   try {
     const result = await confirmBooking(null, input);
+    // BD-W6: post-commit job creation (customer checkout path).
+    await safeWorkerPropagation(() => ensureJobForBooking(result.booking.id));
     return ok(result, randomUUID());
   } catch (err) {
     const appErr = toAppError(err);
@@ -277,6 +320,7 @@ export async function hubCancelBookingAction(input: {
   try {
     const session = await requireCustomerSession(input.sessionId);
     const outcome = await cancelBooking(null, { booking_id: session.bookingId, reason: input.reason });
+    await safeWorkerPropagation(() => propagateCancellationToJob(session.bookingId, input.reason ?? "booking_cancelled"));
     return ok(outcome);
   } catch (err) {
     const appErr = toAppError(err);
@@ -308,6 +352,9 @@ export async function hubRescheduleBookingAction(input: {
         accepted_target_total_minor: input.accepted_target_total_minor,
         idempotency_key: `hub-${session.sessionId}-${input.target_start}`,
       },
+    );
+    await safeWorkerPropagation(() =>
+      propagateRescheduleToJob(session.bookingId, outcome.booking.scheduled_start, outcome.booking.scheduled_end),
     );
     return ok(outcome);
   } catch (err) {

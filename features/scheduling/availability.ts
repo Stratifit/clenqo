@@ -208,53 +208,25 @@ async function loadOccupied(branchId: string, windowStart: Date, windowEnd: Date
     out.push({ start: new Date(h.start_time).getTime(), end: new Date(h.end_time).getTime() });
   }
 
-  // Committed occupancy = jobs in blocking statuses. The jobs table arrives
-  // with the Booking-phase change (stage 5); until then the relation does
-  // not exist. Probe via to_regclass FIRST — a failed statement would abort
-  // the surrounding transaction (25P02), which a swallowed catch cannot
-  // undo (task 7.3 forward-compatibility without transaction damage).
-  const jobsExists = await query<{ exists: boolean }>(
-    `select to_regclass('public.jobs') is not null as exists`,
+  // Committed occupancy = committed bookings (BD-W13/TD-W10: bookings are
+  // the SINGLE authoritative occupancy source). The Change 3 speculative
+  // `jobs` probe was removed in Change 6: every booking-sourced job is
+  // already covered by its booking row, so counting jobs would double-count.
+  // Bookings in blocking statuses occupy; cancelled never does; no_show and
+  // completed are past-start in practice but kept for overlap correctness.
+  const bookings = await query<{ scheduled_start: string; scheduled_end: string }>(
+    `select b.scheduled_start, b.scheduled_end
+     from public.bookings b
+     where b.branch_id = $1
+       and b.status in ('confirmed', 'assigned', 'in_progress', 'completed')
+       and b.scheduled_start < $3::timestamptz and b.scheduled_end > $2::timestamptz`,
+    params,
   );
-  if (jobsExists.rows[0]?.exists) {
-    const jobs = await query<{ scheduled_start: string; scheduled_end: string }>(
-      `select j.scheduled_start, j.scheduled_end
-       from public.jobs j
-       where j.branch_id = $1
-         and j.scheduled_start < $3::timestamptz and j.scheduled_end > $2::timestamptz`,
-      params,
-    );
-    for (const j of jobs.rows) {
-      out.push({
-        start: new Date(j.scheduled_start).getTime(),
-        end: new Date(j.scheduled_end).getTime(),
-      });
-    }
-  }
-
-  // Committed bookings occupy capacity too (design TD-3.1): once jobs are
-  // deferred to the Worker change, a confirmed booking IS the reservation.
-  // Cancelled bookings never occupy; no_show/completed are past-start in
-  // practice but are kept here for window-overlap correctness. Same probe
-  // pattern as `jobs` — a missing relation must not abort a transaction.
-  const bookingsExists = await query<{ exists: boolean }>(
-    `select to_regclass('public.bookings') is not null as exists`,
-  );
-  if (bookingsExists.rows[0]?.exists) {
-    const bookings = await query<{ scheduled_start: string; scheduled_end: string }>(
-      `select b.scheduled_start, b.scheduled_end
-       from public.bookings b
-       where b.branch_id = $1
-         and b.status in ('confirmed', 'assigned', 'in_progress', 'completed')
-         and b.scheduled_start < $3::timestamptz and b.scheduled_end > $2::timestamptz`,
-      params,
-    );
-    for (const b of bookings.rows) {
-      out.push({
-        start: new Date(b.scheduled_start).getTime(),
-        end: new Date(b.scheduled_end).getTime(),
-      });
-    }
+  for (const b of bookings.rows) {
+    out.push({
+      start: new Date(b.scheduled_start).getTime(),
+      end: new Date(b.scheduled_end).getTime(),
+    });
   }
 
   return out;

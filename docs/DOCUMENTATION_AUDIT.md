@@ -297,8 +297,15 @@ The problems are concentrated in **cross-document detail drift** that was introd
   documented (Worker change creates jobs idempotently from confirmed
   bookings), and committed bookings occupy scheduling capacity via the
   `bookings` table until jobs exist.
+* **Change 6 follow-up (implemented, migration `0012_worker.sql`):** the TD-1
+  boundary was consumed by Change 6 (`create-worker`) — jobs are now created
+  idempotently post-commit from confirmed bookings, the speculative Change 3
+  `jobs` occupancy probe was removed (bookings remain the single
+  authoritative occupancy source), and the outbox was extended for worker
+  events with `booking_id` relaxed to nullable. Change 5 booking semantics
+  are unchanged.
 
-## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment
+## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment — RESOLVED (2026-09, owner decision BD-W1, Change 6)
 
 * **ID:** HIGH-6
 * **Severity:** HIGH
@@ -310,6 +317,12 @@ The problems are concentrated in **cross-document detail drift** that was introd
 * **Why it matters:** RLS for cleaner job access and the assignment engine both derive branch authorization from the employee record; the two models produce different schemas and different policies.
 
 * **Recommended resolution:** Decide now (a single nullable primary branch + a future `employee_branches` join table, or the join table from day one) and align DATABASE §23.1 with EM-003.
+* **Resolution (Change 6, implemented migration `0012_worker.sql`):** the
+  many-to-many `employee_branches` join table is the authoritative
+  employee-to-branch authorization relationship from V1 (owner decision
+  BD-W1); no scalar `employees.branch_id` authorization column exists in the
+  implemented schema. This aligns the database with REQUIREMENTS EM-003 and
+  the `membership_branches` model used for internal users.
 
 ---
 
@@ -367,7 +380,7 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 * **Recommended resolution:** In DATABASE §11.1, mark `branches.locale` as the default locale only and cross-reference `website_locales` as the enabled-locale source of truth.
 
-## MEDIUM-5 — Employment types: `on_call` appears only in DATABASE
+## MEDIUM-5 — Employment types: `on_call` appears only in DATABASE — RESOLVED (2026-09, owner decision BD-W3, Change 6)
 
 * **ID:** MEDIUM-5
 * **Severity:** MEDIUM
@@ -379,6 +392,10 @@ The problems are concentrated in **cross-document detail drift** that was introd
 * **Why it matters:** Small, but employment types feed legal/compliance categorization (LEGAL_COMPLIANCE §37–38); an unexplained extra value is a compliance question, not just a typo.
 
 * **Recommended resolution:** Remove `on_call` from DATABASE or add it to the other three lists with a note that its legal validity is jurisdiction-dependent.
+* **Resolution (Change 6, implemented migration `0012_worker.sql`):** the
+  canonical V1 employment types are exactly `full_time | part_time | minijob
+  | flexible` (owner decision BD-W3); the implemented `employment_type` CHECK
+  excludes `on_call`.
 
 ## MEDIUM-6 — Audit log payload style: `old_data/new_data` vs bounded metadata
 
