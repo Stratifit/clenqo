@@ -42,6 +42,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const canViewJobs = hasPermission(ctx, "jobs.view");
   const canViewBookings = hasPermission(ctx, "bookings.view");
   const canViewCustomers = hasPermission(ctx, "customers.view");
+  const canViewServices = hasPermission(ctx, "services.view");
+  const canViewPricing = hasPermission(ctx, "pricing.view");
+  const canViewScheduling = hasPermission(ctx, "branches.view");
   const canCreateBranch = hasPermission(ctx, "branches.create");
   const canInvite = hasPermission(ctx, "users.invite");
 
@@ -65,6 +68,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {canViewJobs && (
             <Link href="/admin/jobs" className="text-gray-600 hover:text-[#07742F]">
               Jobs
+            </Link>
+          )}
+          {canViewServices && (
+            <Link href="/admin/services" className="text-gray-600 hover:text-[#07742F]">
+              Services
+            </Link>
+          )}
+          {canViewPricing && (
+            <Link href="/admin/pricing" className="text-gray-600 hover:text-[#07742F]">
+              Pricing
+            </Link>
+          )}
+          {canViewScheduling && (
+            <Link href="/admin/scheduling" className="text-gray-600 hover:text-[#07742F]">
+              Scheduling
             </Link>
           )}
           {canViewBookings && (

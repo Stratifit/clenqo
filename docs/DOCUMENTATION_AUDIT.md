@@ -497,6 +497,39 @@ authoring with no remaining owner decisions.
 
 ---
 
+# 4f. Change 10 Config Admin UI — decision + implementation record (2026-09, BD-E3a–BD-E3e)
+
+**Decision round (BD-E3):**
+
+* **BD-E3a — Packaging:** ONE combined Change 10 `create-config-admin-ui`
+  (capability `admin-config`) covering Service Catalog, Pricing, and
+  Scheduling admin UIs — one milestone, one review/verification cycle.
+* **BD-E3b — Scheduling authorization:** the existing model is KEPT. All
+  scheduling mutations require `branches.edit` (granted to `hq_admin` only in
+  `lib/permissions.ts`): the Change 10 scheduling mutation UI is
+  HQ-Admin-only; Branch Managers get read-only rendering where read contracts
+  permit. No new permission, no `lib/permissions.ts` change, no RLS change,
+  no Branch-Manager grant. The SCHEDULING_SYSTEM role mismatch is recorded in
+  `SCHEDULING_SYSTEM.md` §87 as a **deferred architectural consideration**.
+* **BD-E3d — Translations:** catalog translation editing is DEFERRED to the
+  future CMS/localization capability; `upsertTranslationAction` is not
+  exposed in the UI (display-only fallback via `EffectiveCatalog`).
+* **BD-E3e — Seed tools:** `seedCatalogAction` / `seedPricingDefaultsAction`
+  remain script/hosted developer operations — no seed UI.
+
+**Implementation record:** `/admin/services`, `/admin/pricing`
+(profiles → versions → draft-only rules → publish/archive → quote-sanity),
+`/admin/scheduling` (config, weekly hours with effective-dating, typed
+exceptions, per-service windows) shipped as pure consumers of the existing
+domain actions under the Change 8 shell with permission-aware navigation.
+**No migration, no new permissions, no RLS changes.** Verification: local
+domain suite `config-admin-ui.test.ts` (27 tests) green within the full local
+regression (357 passed / 104 skipped / 0 failed); typecheck, lint, build
+clean; hosted dedicated suite **7/7** (`hv10-` prefix, zero leftovers) and
+full hosted Changes 1–10 regression **104/104** against the real Supabase
+project (schema regression: chain unchanged at 0014; RLS probes as the real
+`authenticated` role).
+
 # 4e. Change 9 Booking + Customer Admin UI — implementation record (2026-09)
 
 `create-booking-admin-ui` was authored as an OpenSpec change (four artifacts

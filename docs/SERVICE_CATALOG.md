@@ -671,3 +671,26 @@ Each future capability must pass the OpenSpec workflow and the prioritization fr
 * **a — V1 catalog content (business approval, per Q6).** The concrete category/service/variant/add-on list, the placement of the four documented names (§7.3 — they appear as both services and categories in the sources), locale coverage, compatibility allow-lists, and quantity bounds. The structure is defined in §7; the content is not.
 * **b — Permission granularity (optional).** Whether the single `services.edit` permission is acceptable for v1 or whether "edit catalog definitions" and "configure branch offering" should be split. Current catalog is sufficient; a split requires extending `SECURITY.md` §14 first (§18).
 * **c — Platform-default rows (minor).** `DATABASE.md` §15 permits `branch_id` to be nullable for organization-wide platform defaults. Whether v1 actually uses nullable platform-default rows or requires `branch_id` on every row should be settled when the Change 2 spec is drafted (a schema detail, not an architectural conflict).
+
+---
+
+## 27. Admin UI Implementation Status (Change 10 — `create-config-admin-ui`)
+
+The catalog administration surface described in §§1–26 is exposed to staff as
+of OpenSpec Change 10 under the Change 8 admin shell:
+
+* `/admin/services` renders the `EffectiveCatalog` tree
+  (category → service → variant → addon plus standalone addons) and consumes
+  **only** the existing services actions: `create*/update*` draft-field
+  editing, `changeStatusAction` (draft/active/archived lifecycle incl. the
+  archive guard and activation preconditions), `setOfferingStateAction`
+  (`is_enabled`/`is_customer_visible` — separate from lifecycle, Q2),
+  `reorderCatalogAction`, `setAddonCompatibilityAction`/
+  `removeAddonCompatibilityAction` (Q3), `findOrphanedAddonsAction`
+  (§26/Q2 orphans surfaced, never hidden), and `renamePublishedSlugAction`
+  (Q7 alias mechanism). Mutations require `services.edit`
+  (`requireHqActor` server-side).
+* Translation editing (`upsertTranslationAction`) is intentionally **not**
+  exposed (BD-E3d — display-only fallback via the read model); seed tools
+  (`seedCatalogAction`) remain script/hosted-only (BD-E3e).
+* No migration, no new permissions, no RLS change.

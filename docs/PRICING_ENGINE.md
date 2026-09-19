@@ -1641,3 +1641,13 @@ Scope of the implementation:
 The authoritative V1 decision record (P1–P22, P-D1) lives in
 `openspec/specs/pricing-engine/spec.md` (promoted from Change 4A) with the
 full analysis in the archived change `openspec/archive/create-pricing-engine/design.md`.
+
+> **Change 10 (`create-config-admin-ui`):** the pricing administration surface
+> is live at `/admin/pricing` — profile list/create/update, version list with
+> effective dating, **draft-only** rule editing through the existing
+> `createPricingRuleAction` (per-`rule_type` configuration schemas enforced
+> server-side; the UI never calculates authoritative prices), publish via
+> `publishPricingVersionAction` (server-side §47 validation; published and
+> archived versions are immutable), archive, and a display-only quote sanity
+> view over `calculateQuoteAction`. Permissions remain the canonical
+> `pricing.view/create/edit/publish/archive` set; no new permissions.

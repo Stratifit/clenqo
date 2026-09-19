@@ -149,6 +149,18 @@ Visible modules depend on the user's permissions and scope.
 > (`bookings.view` / `customers.view`); every request re-validates the
 > Change 8 branch context server-side (BD-B1 isolation verified by domain +
 > hosted RLS tests).
+>
+> **Implemented (Change 10):** the configuration modules are live under the
+> same shell: `/admin/services` (catalog tree, CRUD, lifecycle, offering
+> toggle, ordering, addon compatibility, orphan inspection, published slug
+> rename — `services.view` / `services.edit`), `/admin/pricing`
+> (profiles → versions → draft-only rules, publish/archive via the server
+> validation, display-only quote sanity — `pricing.*`), and `/admin/
+> scheduling` (config, operating hours, exceptions, service scheduling
+> rules — reads branch-access-gated, mutations HQ-Admin-only via the
+> existing `branches.edit`, BD-E3b; the SCHEDULING_SYSTEM role mismatch is
+> recorded as a deferred architectural consideration). Translation editing
+> (BD-E3d) and seed tools (BD-E3e) are intentionally not exposed.
 
 ---
 

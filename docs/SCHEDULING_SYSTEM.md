@@ -1685,3 +1685,35 @@ dedicated security decision (see §56).
 The implementation must not duplicate pricing or duration calculation inside
 Scheduling. As of Change 4A the authoritative duration source is the
 implemented Pricing Engine (P21); the placeholder provider no longer exists.
+
+---
+
+## 87. Admin UI Implementation Status (Change 10 — `create-config-admin-ui`)
+
+The scheduling administration surface is live at `/admin/scheduling` under the
+Change 8 admin shell, consuming the existing scheduling actions only:
+
+* **Configuration** — `getSchedulingConfigAction` /
+  `updateSchedulingConfigAction` (S17 fields: notice, advance, grid, buffers,
+  concurrency cap, customer horizon, hold TTL).
+* **Operating hours** — `listOperatingHoursAction` /
+  `upsertOperatingHoursAction` (weekly template with effective-dating;
+  history immutable, S2).
+* **Exceptions** — `listScheduleExceptionsAction` /
+  `createScheduleExceptionAction` / `deleteScheduleExceptionAction` (typed
+  V1 model, S9/S9b; `reduced_hours` requires replacement intervals).
+* **Service scheduling rules** — `upsertServiceSchedulingRuleAction`
+  (windows only, S18; never duration or price, S6).
+
+Reads are branch-access-gated; **mutations require the existing
+`branches.edit` permission, which the canonical catalog grants to `hq_admin`
+only** (BD-E3b): the mutation UI is HQ-Admin-only and renders read-only
+otherwise.
+
+> **Deferred architectural consideration (BD-E3b, recorded not resolved):**
+> `SCHEDULING_SYSTEM.md` prose in places implies Branch-Manager scheduling
+> configuration, but the shipped authorization contract gates all scheduling
+> mutations behind `branches.edit` (hq_admin-only). The implementation keeps
+> the contract authoritative; reconciling the documentation/role model is a
+> future decision and was intentionally **not** reopened in Change 10 (no
+> permission changes, no RLS changes).

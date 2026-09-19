@@ -361,6 +361,13 @@ Total
 
 Every confirmed booking stores the relevant pricing snapshot.
 
+> **Implemented (Changes 4A/10):** the deterministic pricing engine and
+> snapshot storage shipped with Change 4A; the **pricing administration
+> surface** (`/admin/pricing` — profiles, versions, draft-only rule editing,
+> publish/archive via the server-side validation, display-only quote sanity)
+> shipped with Change 10 (`create-config-admin-ui`), consuming the existing
+> pricing contracts only (the UI never calculates authoritative prices).
+
 ---
 
 # 11. Phase 1 — Availability
@@ -381,8 +388,16 @@ Implement:
 
 Availability must be calculated server-side.
 
----
+> **Implemented (Changes 3/10):** the availability engine, scheduling
+> configuration, operating hours, exceptions, and service scheduling rules
+> shipped with Change 3; the **scheduling administration surface**
+> (`/admin/scheduling` — config, weekly hours with effective-dating, typed
+> exceptions, per-service windows) shipped with Change 10, with mutations
+> HQ-Admin-only via the existing `branches.edit` (BD-E3b) and reads
+> branch-access-gated. The SCHEDULING_SYSTEM role mismatch is a deferred
+> architectural consideration.
 
+---
 # 12. Phase 1 — Customer Booking
 
 Customer flow:

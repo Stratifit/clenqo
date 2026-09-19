@@ -984,6 +984,11 @@ It should provide visibility into:
 > (status filtering, search per §36 customer/booking targets) and the
 > Customers module (detail + `customers.edit` editing). Employees/jobs are
 > reached through the existing `/admin/employees` and `/admin/jobs` pages.
+> Change 10 (`create-config-admin-ui`) adds the configuration modules:
+> `/admin/services` (catalog administration), `/admin/pricing` (profiles,
+> versions, draft-only rules, publish/archive, quote sanity), and
+> `/admin/scheduling` (config, operating hours, exceptions, service rules —
+> mutations HQ-Admin-only via the existing `branches.edit`, BD-E3b).
 > Today/upcoming grouping, schedule views, revenue, operational issues, and
 > reviews remain their own future changes (Reporting/Reviews/Notifications).
 

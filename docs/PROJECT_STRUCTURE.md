@@ -277,6 +277,16 @@ Actual URL naming can be adjusted without changing domain boundaries.
 > (`getBookingTimelineAction`) in `features/booking/actions.ts`. Branch
 > context, permissions, and RLS are the Change 8/Change 5 foundations
 > unchanged.
+>
+> **Implemented (Change 10):** the configuration consumer modules shipped
+> under the same shell — `app/(admin)/admin/services/page.tsx` (+ catalog
+> mutations island over the existing services actions), `app/(admin)/admin/
+> pricing/page.tsx` (+ `[profileId]` versions and `[profileId]/[versionId]`
+> draft rule editor / publish / archive / quote-sanity), and
+> `app/(admin)/admin/scheduling/page.tsx` (+ config / operating-hours /
+> exception / service-rule editors). All consume the existing domain actions
+> only; no migration, no new permissions, no RLS change. Scheduling
+> mutations render read-only without `branches.edit` (BD-E3b).
 
 # 13. Cleaner Routes
 
