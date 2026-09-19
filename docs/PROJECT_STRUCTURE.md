@@ -264,9 +264,19 @@ Actual URL naming can be adjusted without changing domain boundaries.
 > into the `(admin)` group byte-identical (URLs `/admin/branches`,
 > `/admin/employees`, `/admin/jobs` unchanged) under the shared protected
 > shell (`layout.tsx`: permission-aware nav, context selector, account
-> menu, sign out). The `bookings/customers/services/pricing/website/
-> payments/invoices/quality/reports/users/settings` directories in the
-> conceptual tree above remain future consumer routes, not Change 8 scope.
+> menu, sign out). The `services/pricing/website/payments/invoices/
+> quality/reports/users/settings` directories in the conceptual tree above
+> remain future consumer routes, not Change 8 scope.
+>
+> **Implemented (Change 9):** the Bookings and Customers consumer modules
+> shipped under the same shell — `app/(admin)/admin/bookings/page.tsx`,
+> `app/(admin)/admin/bookings/[id]/page.tsx` (+ detail client actions and
+> the `/admin/bookings/new` creation wizard), `app/(admin)/admin/customers/
+> page.tsx`, `app/(admin)/admin/customers/[id]/page.tsx` (+ edit form and
+> address manager), with the thin read-only staff timeline action
+> (`getBookingTimelineAction`) in `features/booking/actions.ts`. Branch
+> context, permissions, and RLS are the Change 8/Change 5 foundations
+> unchanged.
 
 # 13. Cleaner Routes
 

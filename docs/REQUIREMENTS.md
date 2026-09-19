@@ -978,6 +978,15 @@ It should provide visibility into:
 * Reviews
 * Branch performance
 
+> **Partially implemented (Changes 8/9):** Branch Managers use the Change 8
+> shell with branch context fixed to their `membership_branches`. Change 9
+> (`create-booking-admin-ui`) adds the branch-scoped Bookings module
+> (status filtering, search per §36 customer/booking targets) and the
+> Customers module (detail + `customers.edit` editing). Employees/jobs are
+> reached through the existing `/admin/employees` and `/admin/jobs` pages.
+> Today/upcoming grouping, schedule views, revenue, operational issues, and
+> reviews remain their own future changes (Reporting/Reviews/Notifications).
+
 ---
 
 # 30. Branch Management Requirements

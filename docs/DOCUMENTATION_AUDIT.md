@@ -453,6 +453,100 @@ The problems are concentrated in **cross-document detail drift** that was introd
 
 ---
 
+# 4d. Change 9 Booking + Customer Admin UI — business decision record (2026-09, BD-B1–BD-B4)
+
+The Change 9 readiness audit (read-only, HEAD `6f34ef4`) evaluated candidate
+next changes and identified **Booking + Customer Admin UI**
+(`create-booking-admin-ui`) as the next isolatable boundary: every server
+contract it needs already exists (`listBookingsAction`, `getBookingAction`,
+`staffCancelBookingAction`, `staffRescheduleBookingAction`,
+`staffCreateBookingAction`, `listCustomersAction`, `getCustomerAction`,
+`updateCustomerAction`), all required permissions are canonical
+(`bookings.view/create/edit/cancel`, `customers.view/edit`), no migration and
+no new permission are required, and the Change 8 shell/context/RLS is the
+direct foundation. The owner resolved the four open surface decisions:
+
+* **BD-B1 Booking list scope:** branch-scoped V1 lists; Branch Managers see
+  only `membership_branches` branches; HQ users switch branch via the Change 8
+  context selector; **no organization-wide "All Branches" aggregation** and no
+  new cross-branch aggregation service (records: `BOOKING_SYSTEM.md` §48
+  block, `ADMIN_SYSTEM.md` §3).
+* **BD-B2 Customer detail exposure/editing:** staff surface shows the full
+  customer contact information authorized by the existing customer service
+  contracts and includes editing via existing `customers.edit`; dedup
+  semantics and MEDIUM-7 untouched; BD-C1 cleaner minimization unchanged.
+* **BD-B3 Staff booking creation:** included; UI is only a consumer of the
+  existing Booking domain (`staffCreateBookingAction`) with existing
+  catalog/scheduling/pricing/permissions/idempotency; recurring bookings,
+  payments, notification delivery, job creation, and workforce assignment are
+  out of scope.
+* **BD-B4 Customer dedup UX:** deferred; no new dedup workflow; existing
+  backend conflict behavior authoritative; a future customer-data change may
+  address advanced deduplication.
+
+**Architectural boundary (recorded):** Change 9 is a UI/application-surface
+change consuming existing domain capabilities. It must not create a new
+booking or customer domain, duplicate pricing/scheduling/cancellation/
+rescheduling logic, modify Worker/Cleaner execution, payments, or notification
+delivery, create new permissions, create a new RLS model, or create a
+migration unless the source of truth proves a genuinely required schema gap
+(none is known).
+
+**Status:** RESOLVED — `create-booking-admin-ui` is ready for OpenSpec
+authoring with no remaining owner decisions.
+
+---
+
+# 4e. Change 9 Booking + Customer Admin UI — implementation record (2026-09)
+
+`create-booking-admin-ui` was authored as an OpenSpec change (four artifacts
+under `openspec/changes/create-booking-admin-ui/`, new capability delta
+`admin-bookings`), implemented, and verified:
+
+* **Surface:** `/admin/bookings` (branch-scoped list, BD-B1), `/admin/bookings/[id]`
+  (authorized detail + read-only staff timeline), `/admin/bookings/new`
+  (creation wizard composing the existing engine: catalog → customer →
+  availability → quote → slot hold → `staffCreateBookingAction` with
+  `source: "dashboard"`, server-authoritative pricing and idempotency),
+  `/admin/customers` (search + read-only `contact_conflict_flag` display,
+  BD-B4), `/admin/customers/[id]` (detail, `customers.edit` editing,
+  address manager). All under the Change 8 `(admin)` shell with
+  permission-aware navigation (`bookings.*` / `customers.*` only).
+* **New server contract:** `getBookingTimelineAction` — thin read-only staff
+  timeline over `public.booking_events` (`bookings.view` + org access +
+  branch scope through the booking's branch; ascending; hard cap 200; no
+  mutation, no new event types, no event-writing logic, no migration, no RLS
+  change). Core lives in `features/booking/service.ts`
+  (`getBookingTimeline`); the action is a wrapper.
+* **Pre-existing defect fixed (Change 5 legacy, exposed by Change 9
+  tests):** `updateCustomer` in `features/booking/customers.ts` bound
+  `[customerId, ...values]` while hardcoding `where id = $1` — the first
+  value placeholder collided with the id parameter and every call failed
+  with a PostgreSQL parameter-count error (surfacing as INTERNAL_ERROR).
+  Change 9's customer-editing UI (BD-B2) is the first caller; the statement
+  now numbers values `$1..$n` and targets `id = $(n+1)` with
+  `[...values, customerId]`. Verified locally (pglite) and hosted
+  (real PostgreSQL) — behavior otherwise unchanged (BD-4 email uniqueness,
+  phone normalization, audit, conflict-flag clearing preserved).
+* **No migration, no new permission, no RLS change** (`lib/permissions.ts`,
+  all migrations, and RLS policies untouched; tests assert the policy
+  inventory is unchanged).
+* **Verification:** local suite **330 passed / 89 skipped** (17 new Change 9
+  domain tests: timeline authorization matrix + read-only guarantee + cap,
+  branch-scope denials, creation idempotency, BD-3 server-side rejection,
+  customer edit/addresses authorization, RLS regression); typecheck, lint,
+  and build clean; hosted dedicated suite **8/8** (schema regression incl.
+  weekday-slot fixture correction, timeline on real Auth users, customer
+  edit on hosted PostgreSQL, staff cancellation + audit, creation
+  idempotency, RLS probes as `authenticated` incl. cleaner/outsider
+  isolation, zero leftovers) and full Changes 1–9 hosted regression
+  **97/97**.
+
+**Status:** IMPLEMENTED — pending review → commit/push →
+archive/promotion round.
+
+---
+
 # 5. Medium Findings
 
 ## MEDIUM-1 — Notification event vocabulary drift

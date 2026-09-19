@@ -20,7 +20,7 @@ import { resolveActor, type AuthContext } from "@/lib/authorization/server";
 import { fail, ok, toAppError, type Result } from "@/lib/errors";
 import { query } from "@/lib/db/server";
 import { AppError, ErrorCode } from "@/lib/errors";
-import { confirmBooking, cancelBooking, overrideCancellationFee, rescheduleBooking, loadBookingForActor } from "./service";
+import { confirmBooking, cancelBooking, overrideCancellationFee, rescheduleBooking, loadBookingForActor, getBookingTimeline } from "./service";
 import {
   ensureJobForBooking,
   propagateRescheduleToJob,
@@ -310,6 +310,22 @@ export async function hubGetTimelineAction(input: { sessionId: string }): Promis
     const appErr = toAppError(err);
     return fail(appErr.code, appErr.message);
   }
+}
+
+/**
+ * Staff booking timeline (Change 9, design §6): thin READ-ONLY view of
+ * `public.booking_events` for staff. Authorization chain mirrors
+ * `loadBookingForActor`: `bookings.view` → load booking (organization
+ * access + `hasBranchScope(booking.branch_id)` enforced by the domain
+ * loader — the booking must belong to the authorized branch). No mutation,
+ * no new event types, no event-writing logic — existing domain event
+ * records remain the only source. Hard row cap (latest 200, presented
+ * ascending) prevents unbounded reads.
+ */
+export async function getBookingTimelineAction(input: {
+  bookingId: string;
+}): Promise<Result<{ event_type: string; created_at: string; metadata: Record<string, unknown> }[]>> {
+  return run(async (ctx) => getBookingTimeline(ctx, input.bookingId));
 }
 
 /** Hub: cancel (BD-2 customer path — deadline enforced in the domain). */

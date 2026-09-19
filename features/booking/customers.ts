@@ -244,10 +244,10 @@ export async function updateCustomer(
 
     const updated = await tx.query<CustomerRecord>(
       `update public.customers set ${sets.join(", ")}, updated_at = now()
-       where id = $1
+       where id = $${params.length + 1}
        returning id, organization_id, email_normalized, phone_e164, first_name, last_name,
                  company, preferred_language, status, contact_conflict_flag, notes`,
-      [customerId, ...params],
+      [...params, customerId],
     );
 
     await writeAuditEvent(

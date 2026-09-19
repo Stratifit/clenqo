@@ -131,7 +131,27 @@ CLENQO Dashboard
 
 Visible modules depend on the user's permissions and scope.
 
+> **Resolved (BD-B1–BD-B3 — Change 9 decision record):** the Bookings and
+> Customers modules enter the operational dashboard in Change 9
+> (`create-booking-admin-ui`) as consumers of the existing Booking/Customer
+> domain contracts under the Change 8 shell: branch-scoped lists per BD-B1,
+> staff customer detail + `customers.edit` editing per BD-B2, and staff
+> booking creation through the existing `staffCreateBookingAction` per
+> BD-B3 (no second booking engine; no new permissions; no migration). The
+> Website/Content/Sections/Media/SEO modules above remain the future CMS
+> change; Payments/Invoices/Reviews/Reports remain their own future changes.
+>
+> **Implemented (Change 9):** both modules are live under the Change 8 shell
+> (`(admin)` group): `/admin/bookings`, `/admin/bookings/new`,
+> `/admin/bookings/[id]` (detail + read-only staff timeline), and
+> `/admin/customers`, `/admin/customers/[id]` (detail, `customers.edit`
+> editing, address manager). Navigation entries are permission-aware
+> (`bookings.view` / `customers.view`); every request re-validates the
+> Change 8 branch context server-side (BD-B1 isolation verified by domain +
+> hosted RLS tests).
+
 ---
+
 
 # 4. One Centralized Platform
 

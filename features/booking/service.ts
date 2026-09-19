@@ -1158,3 +1158,34 @@ function quoteInputsOf(booking: BookingRow): Record<string, unknown> {
 export async function loadBookingForActor(ctx: AuthContext, bookingId: string): Promise<BookingRow> {
   return loadBooking(bookingId, ctx);
 }
+
+/** Change 9: hard cap for the staff booking timeline read (design §6). */
+export const STAFF_TIMELINE_CAP = 200;
+
+/**
+ * Change 9 — staff booking timeline core (read-only). Authorizes through the
+ * standard booking loader (permission + org access + branch scope), then
+ * returns the booking's events ascending, capped. No mutation; no new event
+ * types; no event-writing logic (design §6).
+ */
+export async function getBookingTimeline(
+  ctx: AuthContext,
+  bookingId: string,
+): Promise<{ event_type: string; created_at: string; metadata: Record<string, unknown> }[]> {
+  requirePermission(ctx, "bookings.view");
+  // Org access + branch scope (fail-closed) inside the domain loader.
+  await loadBookingForActor(ctx, bookingId);
+  const events = await query<{ event_type: string; created_at: string; metadata: Record<string, unknown> }>(
+    `select event_type, created_at::text, metadata
+     from (
+       select event_type, created_at, metadata
+       from public.booking_events
+       where booking_id = $1
+       order by created_at desc
+       limit $2
+       ) latest
+       order by created_at asc`,
+    [bookingId, STAFF_TIMELINE_CAP],
+  );
+  return events.rows;
+}

@@ -1046,6 +1046,48 @@ Notifications sent
 
 ---
 
+> **Resolved (BD-B1–BD-B4 — Change 9 decision record, 2026-09):** the staff
+> Booking + Customer Admin UI (Change 9, `create-booking-admin-ui`) consumes
+> the existing Booking domain only — no second booking engine.
+>
+> * **BD-B1 — Booking list scope (branch-scoped):** V1 booking lists are
+>   branch-scoped. Branch Managers see only their `membership_branches`
+>   branches; HQ Staff/HQ Admin use the Change 8 branch context (selector)
+>   and see the selected branch's bookings. **No organization-wide
+>   "All Branches" aggregation view is introduced** and no cross-branch
+>   aggregation service is created; Change 9 consumes the existing
+>   branch-context architecture rather than expanding it. A future change
+>   may add HQ aggregation.
+> * **BD-B2 — Staff customer detail/editing:** the staff surface shows the
+>   full customer contact information already authorized by the existing
+>   customer service contracts (name, email, phone, addresses, booking
+>   relationship/history available through existing authorized data) and
+>   **includes customer editing** through the existing `customers.edit`
+>   permission — no new permission, no change to organization/branch
+>   authorization, RLS, or customer dedup semantics, no redesign of customer
+>   identity/deduplication (MEDIUM-7 untouched). The Change 7
+>   cleaner-minimized customer visibility rules (BD-C1) are unchanged — this
+>   is a staff/admin surface, not a cleaner surface.
+> * **BD-B3 — Staff booking creation included:** the admin UI exposes the
+>   existing `staffCreateBookingAction` contract only. It must use existing
+>   Booking domain rules, catalog/service data, Scheduling availability,
+>   Pricing calculation, branch context, permissions, and the existing
+>   booking confirmation/idempotency behavior. Explicitly out of scope:
+>   recurring booking creation, payment processing, notification delivery,
+>   job-creation logic, workforce assignment, and customer-facing booking UX.
+> * **BD-B4 — Customer dedup UX deferred:** no dedicated
+>   deduplication/conflict-resolution interface in Change 9. Existing
+>   backend customer matching/conflict behavior remains authoritative; if an
+>   existing action naturally exposes a conflict indicator, the UI may
+>   display it, but Change 9 must not introduce a new dedup workflow
+>   (MEDIUM-7 stays open for a future customer-data change).
+>
+> Routes: `/admin/bookings`, `/admin/bookings/[id]`, `/admin/customers`,
+> `/admin/customers/[id]` under the Change 8 `(admin)` shell. No migration
+> and no new permission are required.
+
+---
+
 # 49. Booking Events
 
 Every important booking state change should create a booking event.
@@ -1491,6 +1533,17 @@ Filters:
 * customer
 * status
 
+> **Implemented (Change 9 — `create-booking-admin-ui`, 2026-09):** the staff
+> surface is live at `/admin/bookings` under the Change 8 `(admin)` shell.
+> Lists are **branch-scoped** (BD-B1 — the Change 8 branch context supplies
+> the branch; no "All Branches" aggregation view exists yet). Status
+> filtering and search (booking number / customer name / email, per §75)
+> use the existing Booking contracts; results respect the existing caps.
+> Creation (BD-B3), cancellation (BD-2), and rescheduling (BD-3) are
+> exposed through the existing staff actions only — the UI is a consumer,
+> never a second engine. Calendar views, cleaner/branch-global filters, and
+> cross-branch aggregation remain future work.
+
 ---
 
 # 74. Booking Detail
@@ -1514,6 +1567,16 @@ Invoice
 ```
 
 Sensitive information should be permission-controlled.
+
+> **Implemented (Change 9):** `/admin/bookings/[id]` renders the authorized
+> booking fields from the existing contracts — customer, service, address,
+> scheduled time, pricing snapshot/totals, status, cancellation state,
+> rescheduling count, and the read-only staff **timeline** (new thin
+> `getBookingTimelineAction` over `booking_events`, ascending, hard-capped;
+> no new event types, no event-writing logic). Where the Worker contract
+> exposes the related job, the page **links** to the existing
+> `/admin/jobs` surface — no second job-management system. Payments and
+> invoice entries await the Payments change and are not rendered.
 
 ---
 

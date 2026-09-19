@@ -444,6 +444,16 @@ Implement:
 * rescheduling;
 * job creation.
 
+> **Implemented (Changes 5/6/9):** the booking engine, events, source,
+> customer relationship, address model, cancellation tiers, and
+> rescheduling shipped with Change 5; job creation with Change 6; the
+> **staff operations surface** (`/admin/bookings`, `/admin/bookings/[id]`,
+> `/admin/customers`, `/admin/customers/[id]` — lists, detail, creation,
+> cancellation, rescheduling, staff timeline, customer edit) with Change 9
+> (`create-booking-admin-ui`), consuming the existing domain contracts under
+> the Change 8 admin shell (BD-B1–BD-B4; branch-scoped lists, no
+> aggregation, no second engine).
+
 ---
 
 # 15. Phase 1 — Initial Notifications
@@ -474,6 +484,14 @@ Branch Managers should see:
 * employees;
 * schedule;
 * operational alerts.
+
+> **Partially implemented (Changes 8/9):** the Change 8 shell gives Branch
+> Managers the protected `/admin` surface with branch context fixed to their
+> `membership_branches`; Change 9 adds branch-scoped booking lists (status
+> filtering, search) and staff customer detail/editing. Employees and jobs
+> are visible through the existing `/admin/employees` and `/admin/jobs`
+> pages; today/upcoming grouping, schedule views, and operational alerts
+> remain future work (alerting belongs to the Notifications change).
 
 ---
 

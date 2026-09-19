@@ -40,6 +40,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const canViewBranches = hasPermission(ctx, "branches.view");
   const canViewEmployees = hasPermission(ctx, "employees.view");
   const canViewJobs = hasPermission(ctx, "jobs.view");
+  const canViewBookings = hasPermission(ctx, "bookings.view");
+  const canViewCustomers = hasPermission(ctx, "customers.view");
   const canCreateBranch = hasPermission(ctx, "branches.create");
   const canInvite = hasPermission(ctx, "users.invite");
 
@@ -63,6 +65,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {canViewJobs && (
             <Link href="/admin/jobs" className="text-gray-600 hover:text-[#07742F]">
               Jobs
+            </Link>
+          )}
+          {canViewBookings && (
+            <Link href="/admin/bookings" className="text-gray-600 hover:text-[#07742F]">
+              Bookings
+            </Link>
+          )}
+          {canViewCustomers && (
+            <Link href="/admin/customers" className="text-gray-600 hover:text-[#07742F]">
+              Customers
             </Link>
           )}
           <div className="ml-auto flex items-center gap-3">
