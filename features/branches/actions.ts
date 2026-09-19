@@ -116,9 +116,10 @@ export async function checkActivationReadinessAction(
 
 export async function activateBranchAction(
   branchId: string,
+  overrideReason?: string,
 ): Promise<Result<BranchRecord>> {
   return run(async () => {
     const ctx = await currentContext();
-    return activateBranch(ctx, branchId);
+    return activateBranch(ctx, branchId, overrideReason ? { overrideReason } : undefined);
   });
 }

@@ -49,7 +49,7 @@ describe("constraints (DATABASE.md §42)", () => {
     });
   });
 
-  it("allows the same slug across different organizations", async () => {
+  it("rejects duplicate slugs across organizations (C8-3: global uniqueness supersedes the org-scoped rule)", async () => {
     await withFreshDb(async (db: SimplePgClient) => {
       const o1 = await db.query<{ id: string }>(
         `insert into public.organizations (name, slug) values ('O1', 'org-1') returning id`,
@@ -57,15 +57,20 @@ describe("constraints (DATABASE.md §42)", () => {
       const o2 = await db.query<{ id: string }>(
         `insert into public.organizations (name, slug) values ('O2', 'org-2') returning id`,
       );
-      for (const org of [o1.rows[0].id, o2.rows[0].id]) {
-        await db.query(
+      await db.query(
+        `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
+         values ($1, 'B', 'berlin', 'DE', 'Europe/Berlin', 'EUR', 'de')`,
+        [o1.rows[0].id],
+      );
+      // C8-3 (Change 8): the public routing namespace is globally unique,
+      // so the same slug in another organization must now be rejected.
+      await expect(
+        db.query(
           `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
            values ($1, 'B', 'berlin', 'DE', 'Europe/Berlin', 'EUR', 'de')`,
-          [org],
-        );
-      }
-      const res = await db.query<{ count: string }>(`select count(*)::text as count from public.branches`);
-      expect(res.rows[0].count).toBe("2");
+          [o2.rows[0].id],
+        ),
+      ).rejects.toThrow(/uq_branches_slug_global/);
     });
   });
 
@@ -74,9 +79,10 @@ describe("constraints (DATABASE.md §42)", () => {
       const org = await db.query<{ id: string }>(
         `insert into public.organizations (name, slug) values ('O', 'o') returning id`,
       );
+      // Fixture slug respects the C8-3 slug shape (2–63 chars).
       const branch = await db.query<{ id: string }>(
         `insert into public.branches (organization_id, name, slug, country_code, timezone, currency, locale)
-         values ($1, 'B', 'b', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
+         values ($1, 'B', 'bb', 'DE', 'Europe/Berlin', 'EUR', 'de') returning id`,
         [org.rows[0].id],
       );
       const site = await db.query<{ id: string }>(
@@ -373,7 +379,7 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
     });
   });
 
-  it("keeps the migration chain file sequence intact (0001–0013)", async () => {
+  it("keeps the migration chain file sequence intact (0001–0014)", async () => {
     const { readdir } = await import("node:fs/promises");
     const files = (await readdir("supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
     expect(files).toEqual([
@@ -390,6 +396,7 @@ describe("service catalog schema (migration 0008, task 2.3)", () => {
       "0011_booking.sql",
       "0012_worker.sql",
       "0013_cleaner_execution.sql", // Change 7 (BD-C): cleaner execution layer
+      "0014_admin_foundation.sql", // Change 8 (C8-3): slug routing identity
     ]);
   });
 });

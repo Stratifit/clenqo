@@ -408,6 +408,25 @@ A branch belongs to exactly one organization.
 
 Branch slug must be unique within the organization.
 
+> **Resolved (C8-3 — Change 8 decision record):** public branch slugs become
+> **globally unique across the CLENQO routing namespace** (a global-unique
+> index replaces the per-organization scope as the routing-relevant
+> constraint; the per-organization uniqueness remains implied). The
+> implementing Change 8 schema work adds slug normalization CHECKs, a
+> reserved-word list, and a `branch_slug_aliases` redirect table; slugs are
+> immutable after activation and HQ-owned (`branches.edit`). Authoritative
+> identity model: UUID = internal identity, display name = public identity,
+> slug = routing identity (BRANCH_SYSTEM §22 record). **Implemented (Change 8,
+> migration `0014_admin_foundation.sql`):** `ck_branches_slug_length`
+> (2–63), `ck_branches_slug_shape` (lowercase `a–z0–9`, no edge hyphens),
+> `ck_branches_slug_reserved` (reserved words incl. `admin`/`cleaner`/
+> `apply`/`login`/`setup`/`book`), `ck_branches_slug_no_double`, the global
+> `uq_branches_slug_global` unique index (a data-validation guard aborts the
+> migration if pre-existing slugs would violate the new rules), and the
+> `branch_slug_aliases` redirect table (globally-unique alias, same shape
+> CHECKs, org/branch-scoped select RLS — a freed slug stays redirectable,
+> never reassignable).
+
 Example:
 
 ```text
@@ -1817,6 +1836,16 @@ invoice_voided
 Audit logs should be append-only.
 
 Normal application users must not be able to modify historical audit records.
+
+> **Implemented (Change 8, `create-admin-foundation`):** security-sensitive
+> admin actions are audited through this existing infrastructure with
+> `resource.action` naming — `admin.setup_completed`,
+> `admin.setup_rejected` (fail-closed bootstrap attempts, attributed to the
+> organization when one exists and written after the aborted attempt rolls
+> back so the record persists), `admin.user_invited`,
+> `admin.invitation_resent`, `admin.user_deactivated`, and
+> `admin.activation_override` (BD-A4 advisory readiness override with actor
+> + reason). No second audit architecture was created.
 
 ---
 

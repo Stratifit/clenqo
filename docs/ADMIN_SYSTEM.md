@@ -58,6 +58,23 @@ This includes, where applicable:
 
 ---
 
+> **Resolved (BD-A2 + foundation boundary — Change 8 decision record):** the V1
+> `/admin` foundation delivers exactly: login + session middleware; the
+> protected admin shell (permission-aware navigation, account menu, sign
+> out); the organization/branch context model with selector (BRANCH_SYSTEM
+> §12–13); and an **operational dashboard** — organization/network identity,
+> branch overview with lifecycle/provisioning state and provisioning
+> failures, operational summary (bookings/jobs/employees counts from existing
+> domain queries), quick actions, current user/role, and security/permission-
+> aware navigation to available modules. Analytics-style metrics (revenue,
+> ratings, performance) stay deferred to the Reporting change; the dashboard
+> shows only data obtainable from existing domains without new business
+> logic. First-run bootstrap (BD-A1, SECURITY §14 record) is part of the
+> foundation; **branch application intake (C8-2) is NOT** — it is a separate
+> future change. Domain editors (bookings, customers, services, scheduling,
+> pricing, website/CMS, notifications, audit, settings) are later consumers
+> of this shell, not part of it.
+
 # 3. Dashboard Is the CMS
 
 The CLENQO Dashboard is not only:
@@ -591,6 +608,35 @@ The branch override belongs to the branch website content.
 It does not modify the master template.
 
 ---
+
+> **Resolved (C8-4 — Change 8 decision record):** V1 uses the **lighter
+> ownership model (option B)**: role + RLS + explicit domain rules — no
+> generic field-level configuration-metadata engine is built. The V1 rule:
+> *HQ/master-controlled* = brand, master website structure/components,
+> master policy templates, security/permission framework, supported-language
+> framework, global booking rules (enforced by `hq_admin`-only permissions
+> and RLS); *branch-owned* = contact details, local content/images/SEO,
+> services offering, pricing configuration, hours/service area operations
+> (enforced by branch-scoped permissions + `membership_branches`); *system-
+> protected* = organization/branch IDs, provisioning lifecycle, audit
+> metadata, RLS configuration (no application role can write these — schema
+> enforced). "Default / inherited / overridden" semantics exist only where a
+> domain already models them (website template defaults per branch;
+> cancellation policies); no new inheritance mechanism in V1. HQ default
+> changes do not retroactively mutate branch-owned values. All ownership-
+> relevant changes are audited per existing domain conventions. Revisit a
+> metadata-driven engine only when a concrete domain requires it.
+
+> **Resolved (C8-5 — Change 8 decision record):** no generic policy engine in
+> V1. Classification: *cancellation policy* — already modeled (booking
+> domain, versioned); *rescheduling policy* — global booking rules (booking
+> domain constraints, BD-3), not branch-authored in V1; *service-area* —
+> branch-owned operational configuration (existing `branches.service_area`);
+> *payment policy, privacy/terms pages, operational policy templates* —
+> **deferred**: master-template instantiation for legal/policy content
+> belongs to the public-website/policy change and is recorded there, not
+> invented here. Nothing in this decision removes an existing modeled
+> policy.
 
 # 23. Content Inheritance
 

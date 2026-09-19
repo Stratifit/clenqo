@@ -316,6 +316,26 @@ The problems are concentrated in **cross-document detail drift** that was introd
   high/critical incident, audited `jobs.manage` override) invoking the
   existing Booking-owned transition contract. No GPS (BD-C6), no customer
   signature (BD-C8), no notification delivery, no new permissions.
+* **Change 8 follow-up (implemented, migration `0014_admin_foundation.sql`):
+  the Admin Foundation (`create-admin-foundation`) implements the resolved
+  decision round — one-time `/setup` bootstrap (BD-A1: zero-active-HQ-admin
+  invariant enforced against committed state, advisory-lock serialization,
+  guarded insert, permanent fail-closed lock with rollback-surviving
+  rejection audits, CLI fallback), `/login` + session-refreshing middleware
+  + protected `(admin)` shell with permission-aware navigation and
+  server-resolved branch context (`?branch=` + cookie echo re-validated per
+  request, C8-1), the operational `/admin` dashboard (BD-A2), Branch
+  Manager `membership_branches` scoping with HQ-only All-Branches (BD-A3),
+  invitation/deactivation via the canonical `users.invite`/`users.edit`
+  permissions (audited `admin.user_invited`/`admin.user_deactivated`),
+  BD-A4 advisory `notification_configuration` readiness with audited
+  `branches.activate` override (`admin.activation_override`), and the C8-3
+  slug schema (global uniqueness, shape/length/reserved CHECKs,
+  `branch_slug_aliases`). Existing branch/employee/job admin pages moved
+  into the `(admin)` route group unchanged — URLs preserved. No branch
+  application flow, no CMS/public-website renderer, no generic
+  inheritance/policy engine, no slug-scoped `/<branch-slug>/admin`, no new
+  permissions.
 
 ## HIGH-6 — `employees.branch_id` single-branch column vs multi-branch employment — RESOLVED (2026-09, owner decision BD-W1, Change 6)
 
@@ -381,6 +401,55 @@ The problems are concentrated in **cross-document detail drift** that was introd
 * **Status:** RESOLVED — no contradiction found with the Worker/Booking
   capability specs, the security/RLS model, or the Media Storage
   architecture. Change 7 is unblocked for OpenSpec authoring.
+
+---
+
+# 4c. Change 8 Admin Foundation / Control Center — decision record (2026-09, BD-A1–BD-A4, C8-1–C8-5)
+
+* **Scope:** resolutions for the Admin Foundation / Control Center (Change 8),
+  taken after the Change 8 readiness audit; recorded in place across
+  `SECURITY.md` §14 (BD-A1 + context + invitation), `BRANCH_SYSTEM.md`
+  (§12 C8-1, §19 BD-A4, §22 C8-3), `ADMIN_SYSTEM.md` (§3 BD-A2 + foundation
+  boundary, §22/§23 C8-4/C8-5), `REQUIREMENTS.md` (§28/§32), `ROADMAP.md`
+  (§35/§36), `DATABASE.md` §11.1, `PROJECT_STRUCTURE.md` §12.
+* **BD-A1 Bootstrap:** one-time `/setup` permitted only while zero active
+  `hq_admin` memberships exist; requires a pre-created Supabase Auth user and
+  a deployment-held one-time `SETUP_TOKEN`; creates org + membership
+  transactionally, consumes the token, audited; fails closed permanently
+  after bootstrap; CLI/script fallback with the same invariant documented.
+* **BD-A2 Dashboard scope:** operational dashboard + protected shell +
+  context model + permission-aware navigation; analytics metrics deferred to
+  Reporting; no domain editors in the foundation.
+* **BD-A3 Branch Manager scope:** same shell, branch context fixed by
+  `membership_branches`; selector enumerates only authorized branches;
+  multi-branch managers switch within their scope; HQ sees org context;
+  cleaners never enter `/admin`; no new permissions.
+* **BD-A4 Activation readiness:** all mandatory items stay;
+  `notification_configuration` downgraded to advisory until delivery ships;
+  audited `branches.activate` override allowed only for advisory-only gaps.
+* **C8-1 Admin URL:** one `/admin` with a server-resolved context (query +
+  cookie echo); `/<branch-slug>/admin` recorded as future evolution; slug
+  changes can never break admin deep links (context key = branch UUID).
+* **C8-2 Branch application:** explicitly deferred to a separate future
+  change with its own decision round (applicant data, statuses, review flow,
+  duplicate handling, invitation timing).
+* **C8-3 Slug/routing identity:** global slug uniqueness; normalization,
+  reserved words, HQ-owned changes, immutability after activation, alias/
+  redirect records; UUID = internal, display name = public identity, slug =
+  routing identity; schema alignment obligations recorded in `DATABASE.md`
+  §11.1.
+* **C8-4 Configuration ownership:** lighter model (role + RLS + explicit
+  domain rules); no generic inheritance engine in V1; HQ-locked vs branch-
+  owned vs system-protected classes defined; revisit only on concrete need.
+* **C8-5 Policy model:** no generic policy engine; cancellation already
+  modeled; rescheduling = global booking rules; service-area = branch-owned;
+  payment/legal/policy templates deferred to the public-website/policy change.
+* **Status:** RESOLVED — contradictions between the one-dashboard model and
+  the slug-scoped-admin vision, and between per-org and global slug
+  uniqueness, are explicitly settled by decision. The narrow Admin Foundation
+  is ready for OpenSpec authoring; the remaining expanded-vision items
+  (application intake, public website, policy templates) are deferred with
+  their own decision rounds recorded.
 
 ---
 

@@ -948,6 +948,20 @@ Potential dashboard information:
 
 ---
 
+> **Resolved (BD-A2/BD-A3 — Change 8 decision record):** the V1 Control Center
+> `/admin` provides an operational dashboard (branch overview,
+> lifecycle/provisioning state and failures, operational counts, quick
+> actions, permission-aware navigation — ADMIN_SYSTEM §3 record) rather than
+> analytics metrics, which remain a Reporting-change capability. HQ Admin and
+> HQ Staff share the same shell at organization scope; **Branch Managers use
+> the same shell with branch context fixed by their `membership_branches`
+> scope** — they see only their authorized branches, with the branch selector
+> enumerating exactly those branches and the dashboard scoped accordingly;
+> multi-branch managers may switch between their own branches. Cleaners never
+> enter `/admin` (their surface remains `/cleaner/*`). No new permissions are
+> introduced; the canonical catalog (SECURITY §14) governs navigation
+> visibility.
+
 # 29. Branch Dashboard Requirements
 
 Branch managers should have a branch-specific dashboard.
@@ -1015,6 +1029,19 @@ Examples of branch content:
 * Local promotions
 
 ---
+
+> **Resolved (BD-A1 — Change 8 decision record):** the first HQ Admin is
+> bootstrapped through a one-time `/setup` flow permitted only while zero
+> active `hq_admin` memberships exist, protected by a deployment-held
+> one-time `SETUP_TOKEN`, permanently disabled after bootstrap (fails closed,
+> attempt audited), with a CLI/script fallback under the same invariant;
+> authentication remains Supabase Auth exclusively (SECURITY §14 record for
+> the full contract). Invitations use the Supabase Auth admin invite
+> primitive gated by `users.invite`. **Implemented (Change 8,
+> `create-admin-foundation`):** `/setup`, `/login`, session middleware, the
+> protected `(admin)` shell + `/admin` dashboard, invitation/deactivation,
+> and BD-A4 advisory readiness with audited override shipped behind the
+> existing canonical permissions; no new permissions or roles were added.
 
 # 32. Authentication Requirements
 

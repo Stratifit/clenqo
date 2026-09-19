@@ -102,18 +102,24 @@ export interface TransactionClient {
 export async function withTransaction<T>(
   fn: (tx: TransactionClient) => Promise<T>,
 ): Promise<T> {
-  // Test executor path: single connection, begin/commit via the executor.
+  // Test executor path: single shared connection, begin/commit via the
+  // executor. Real PostgreSQL runs each transaction on its own session;
+  // on the shared executor, concurrent transactions would interleave
+  // statements and corrupt BEGIN/COMMIT pairing — so whole transactions
+  // are serialized here, faithfully emulating per-session atomicity.
   if (usingTestExecutor()) {
     const client = executor!;
-    await client.query("begin");
-    try {
-      const result = await fn(wrapTx(client));
-      await client.query("commit");
-      return result;
-    } catch (err) {
-      await client.query("rollback");
-      throw err;
-    }
+    return runSerializedTestTx(async () => {
+      await client.query("begin");
+      try {
+        const result = await fn(wrapTx(client));
+        await client.query("commit");
+        return result;
+      } catch (err) {
+        await client.query("rollback");
+        throw err;
+      }
+    });
   }
 
   // Production path: dedicated pool client for the whole transaction.
@@ -142,6 +148,23 @@ export async function withTransaction<T>(
   } finally {
     client.release();
   }
+}
+
+/**
+ * Serialization chain for test-mode transactions (single shared executor).
+ * Each queued transaction waits for the previous one to settle, so a
+ * transaction observes either the fully-committed or fully-rolled-back
+ * state of every earlier transaction — identical to per-session behavior.
+ */
+let testTxChain: Promise<unknown> = Promise.resolve();
+
+function runSerializedTestTx<T>(fn: () => Promise<T>): Promise<T> {
+  const run = testTxChain.then(fn, fn);
+  testTxChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 function wrapTx(client: SimplePgClient): TransactionClient {

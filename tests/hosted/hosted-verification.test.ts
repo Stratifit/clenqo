@@ -759,9 +759,13 @@ describe.skipIf(!HOSTED)("hosted verification: create-branch-provisioning", () =
 
     const readiness = await checkActivationReadiness(ctx, branch1());
     expect(readiness.eligible).toBe(false);
+    // BD-A4 (Change 8): notification_configuration is ADVISORY — reported via
+    // advisoryMissing, never in the blocking list. Mandatory items unchanged.
     expect(readiness.missing).toEqual(
-      expect.arrayContaining(["services", "pricing", "operating_hours", "manager", "notification_configuration"]),
+      expect.arrayContaining(["services", "pricing", "operating_hours", "manager", "service_area"]),
     );
+    expect(readiness.missing).not.toContain("notification_configuration");
+    expect(readiness.advisoryMissing).toContain("notification_configuration");
 
     let err: unknown;
     try {

@@ -432,6 +432,37 @@ services.edit
 #   quality.resolve_issue / quality.report / quality.manage (composite)
 # branches.view / branches.create / branches.edit / branches.activate /
 #   branches.suspend / branches.archive
+> **Resolved (BD-A1 + auth/context/invitation decisions — Change 8 decision record):**
+> *Bootstrap (BD-A1).* The first HQ Admin is created through a one-time
+> `/setup` flow permitted only while **zero active `hq_admin` memberships**
+> exist. Setup requires (a) a Supabase Auth user created beforehand through
+> the Supabase Auth admin surface (dashboard/API — the established precedent),
+> and (b) a one-time deployment-held `SETUP_TOKEN` env secret presented to the
+> setup action. Setup creates the initial organization (if none) and the
+> `hq_admin` membership transactionally, consumes the token, and writes an
+> audit event. After the first active HQ Admin exists, `/setup` fails closed
+> permanently (stable error, attempt audited); a CLI/script fallback with the
+> same zero-HQ-admin invariant remains the documented recovery path. Setup is
+> never a public application feature and is disabled-by-absence-of-preconditions
+> — no "make me admin" endpoint can exist.
+> *Context model.* V1 is a single-organization platform; `resolveActor`'s
+> deterministic oldest-active-membership resolution is authoritative for V1
+> and multi-organization users are a documented future capability. Branch
+> context is resolved server-side on every request (`hasBranchScope` via
+> `membership_branches`); UI selection is only a view preference and never
+> carries authorization. Branch-access changes take effect on the next
+> request. Staff sessions use Supabase Auth session cookies exclusively;
+> `middleware.ts` refreshes sessions and redirects unauthenticated `/admin/*`
+> requests to the login flow, with the server-action/domain layer remaining
+> the authoritative guard (route protection is UX, not the security boundary).
+> *Invitation.* V1 invitations use the Supabase Auth admin invite primitive
+> (`inviteUserByEmail`) invoked from a server action gated by `users.invite`.
+> Invite creates the `memberships` row (+ `membership_branches` scope) in one
+> transaction with an audit event; existing users are granted membership
+> directly without re-invite; resend re-invokes the primitive. Deactivation
+> sets `memberships.status = 'inactive'` and is audited; rows are never
+> deleted.
+
 # users.view / users.invite / users.edit / users.deactivate
 # reports.view / reports.export / reports.financial / reports.workforce /
 #   reports.customer / reports.quality / reports.cross_branch /

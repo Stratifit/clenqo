@@ -806,6 +806,27 @@ Implement advanced HQ capabilities:
 
 ---
 
+> **Resolved (C8-2 — Change 8 decision record):** branch application intake
+> (`/apply/branch`, applicant → pending → HQ review → needs-info/rejected/
+> approved → creation/provisioning/owner-invitation) is **explicitly
+> deferred to a separate future change**, not silently absent: the Admin
+> Foundation (next change) delivers login, bootstrap, the protected `/admin`
+> shell with context selector, and the operational dashboard only. The
+> review workflow becomes a natural consumer of that shell once its business
+> rules (applicant data set, statuses, duplicate handling, owner-invitation
+> timing) receive their own decision round.
+
+> **Resolved (BD-A4 — Change 8 decision record):** activation readiness keeps
+> all mandatory requirements (provisioning ready, website, active service,
+> published pricing, operating hours, service area, manager) and downgrades
+> `notification_configuration` to an advisory item until notification
+> delivery ships; `branches.activate` holders may override advisory-only
+> gaps via an explicit audited action — mandatory items are never
+> overridable (BRANCH_SYSTEM §19 record). **Implemented (Change 8,
+> `create-admin-foundation`):** `features/branches/activation.ts` carries the
+> advisory flag and override path (`admin.activation_override` audit), and
+> the readiness surface is exposed through the protected admin shell.
+
 # 36. Branch Lifecycle
 
 Formalize:

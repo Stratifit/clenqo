@@ -15,6 +15,9 @@ export interface ReadinessItem {
   requirement: string;
   satisfied: boolean;
   note?: string;
+  /** BD-A4: advisory items never block activation (notification delivery
+   *  does not exist yet); displayed as "recommended, not required". */
+  advisory?: boolean;
 }
 
 /**
@@ -73,7 +76,7 @@ export async function evaluateReadiness(branch: BranchRecord): Promise<Readiness
   });
   items.push({ requirement: "service_area", satisfied: Boolean(branch.service_area) });
   items.push({ requirement: "manager", satisfied: await hasAssignedManager(branch), note: "assign via membership_branches" });
-  items.push({ requirement: "notification_configuration", satisfied: false, note: "notifications domain ships later" });
+  items.push({ requirement: "notification_configuration", satisfied: false, advisory: true, note: "notifications domain ships later — recommended, not required" });
 
   return items;
 }
@@ -98,6 +101,8 @@ async function hasAssignedManager(branch: BranchRecord): Promise<boolean> {
 export interface ActivationCheckResult {
   eligible: boolean;
   missing: string[];
+  /** BD-A4: advisory items that are unmet — never blocking. */
+  advisoryMissing: string[];
   items: ReadinessItem[];
 }
 
@@ -115,23 +120,28 @@ export async function checkActivationReadiness(
   if (!branch) throw new AppError(ErrorCode.NOT_FOUND, "Branch not found.");
 
   const items = await evaluateReadiness(branch);
-  const missing = items.filter((i) => !i.satisfied).map((i) => i.requirement);
-  const provisioningReady = branch.provisioning_status === "ready";
+  const mandatoryMissing = items.filter((i) => !i.satisfied && !i.advisory).map((i) => i.requirement);
+  const advisoryMissing = items.filter((i) => !i.satisfied && i.advisory).map((i) => i.requirement);
   return {
-    eligible: provisioningReady && missing.length === 0,
-    missing: provisioningReady ? missing : ["provisioning_ready", ...missing],
+    // BD-A4: advisory items never block eligibility (provisioning-ready is
+    // still a hard precondition enforced by activateBranch itself).
+    eligible: mandatoryMissing.length === 0,
+    missing: mandatoryMissing,
+    advisoryMissing,
     items,
   };
 }
 
 /**
- * Activate the branch. Refuses when provisioning is not ready or mandatory
- * configuration is missing; audits `branch.activated` transactionally with
- * the status change.
+ * Activate the branch (BD-A4). Refuses when provisioning is not ready or
+ * mandatory configuration is missing; audits `branch.activated` transactionally
+ * with the status change. When the only unmet items are advisory, an explicit
+ * override (actor + reason, audited `admin.activation_override`) is required.
  */
 export async function activateBranch(
   ctx: AuthContext,
   branchId: string,
+  opts?: { overrideReason?: string },
 ): Promise<BranchRecord> {
   requirePermission(ctx, "branches.activate");
   requireOrganizationAccess(ctx, ctx.actor.organizationId);
@@ -145,18 +155,42 @@ export async function activateBranch(
   if (branch.status === "active") return branch; // idempotent
 
   if (branch.provisioning_status !== "ready") {
+    // Mandatory (BD-A4): provisioning-ready is never overridable.
     throw new AppError(
       ErrorCode.BRANCH_INACTIVE,
-      "Branch provisioning must be ready before activation.",
+      "Activation requirements not met: provisioning_ready",
     );
   }
 
-  const { eligible, missing } = await checkActivationReadiness(ctx, branchId);
+  const { eligible, missing, advisoryMissing } = await checkActivationReadiness(ctx, branchId);
+
   if (!eligible) {
+    // BD-A4: mandatory failures can never be overridden.
     throw new AppError(
       ErrorCode.BRANCH_INACTIVE,
       `Activation requirements not met: ${missing.join(", ")}`,
     );
+  }
+
+  // Advisory-only gaps require an explicit audited override.
+  if (advisoryMissing.length > 0) {
+    const reason = opts?.overrideReason?.trim();
+    if (!reason) {
+      throw new AppError(
+        ErrorCode.BRANCH_INACTIVE,
+        `Advisory requirements unmet (override required): ${advisoryMissing.join(", ")}`,
+      );
+    }
+    await writeAuditEvent({
+      action: "admin.activation_override",
+      organizationId: branch.organization_id,
+      branchId,
+      actorUserId: ctx.actor.userId,
+      resourceType: "branch",
+      resourceId: branchId,
+      requestId: ctx.requestId ?? null,
+      metadata: { overridden_items: advisoryMissing, reason },
+    });
   }
 
   const activated = await withTransaction(async (tx) => {

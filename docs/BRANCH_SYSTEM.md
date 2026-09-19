@@ -225,6 +225,19 @@ Munich
 
 The list must contain only authorized branches.
 
+> **Resolved (C8-1 — Change 8 decision record):** V1 uses **one `/admin`
+> surface with an explicit context model**, not slug-scoped `/<branch-slug>/admin`
+> routes. The context is a query/cookie-backed selection (`?branch=<branchId>`
+> with a non-sensitive cookie echo for persistence across navigation),
+> resolved and validated server-side on every request against
+> `membership_branches`; `All Branches` organization context is available to
+> HQ Admin/HQ Staff only (§13). Deep links carry the context parameter; slug
+> changes therefore never break admin URLs (branch UUID is the context key,
+> never the slug). `/<branch-slug>/admin` remains a documented future
+> evolution for customer-perceived branch identity; adopting it later is a
+> routing change only, because authorization was never URL-derived. Cleaner
+> routes remain strictly separate under `/cleaner/*`.
+
 ---
 
 # 13. HQ Global Context
@@ -347,6 +360,20 @@ A branch should not be publicly activated until required provisioning succeeds.
 
 ---
 
+> **Resolved (BD-A4 — Change 8 decision record):** activation readiness is:
+> provisioning `ready` AND website ready AND ≥1 active service AND ≥1 active
+> pricing profile with a published version AND operating hours AND service
+> area AND an assigned branch manager. `notification_configuration` is
+> **downgraded from a hard blocker to an advisory readiness item** for the V1
+> in which notification delivery does not yet exist — the readiness checklist
+> and Control Center display it as "recommended, not required", never
+> silently removed. **HQ override:** a user holding `branches.activate` may
+> activate a branch whose remaining missing items are advisory-only via an
+> explicit, audited, server-authoritative override action (override reason +
+> actor recorded); mandatory items can never be overridden. Branches see
+> their own readiness failures in the Control Center (existing per-branch
+> detail surface).
+
 # 19. Branch Activation
 
 Creating a branch and activating a branch are separate operations.
@@ -401,6 +428,26 @@ Example:
 ```
 
 The slug must be unique within the public routing namespace.
+
+> **Resolved (C8-3 — Change 8 decision record):** public branch slugs are
+> **globally unique across the entire CLENQO routing namespace** (not merely
+> per organization). Normalization: lowercase, NFKC, trim; allowed
+> characters `a–z0–9` and `-`; no leading/trailing/double hyphens; length
+> 2–63; a reserved-word list (admin, cleaner, apply, api, login, setup,
+> static, public, assets, book, auth, settings, profile, help, legal) is
+> enforced. Collision handling: creation rejects with a stable validation
+> error; slug changes require a free slug. **Authority:** HQ Admin owns slug
+> changes (`branches.edit`); branch owners cannot change their slug in V1.
+> Slugs become **immutable after branch activation**; changes to an active
+> branch's routing identity are possible only by deactivation → HQ change →
+> re-provisioning review. An **alias/redirect record** (old slug → branch
+> UUID, 301 at the public-site layer) is retained when a pre-activation slug
+> changes; alias retention duration is a public-website-change concern.
+> Identity principle (authoritative): **branch UUID = immutable internal
+> identity; display name = public branch identity; slug = routing
+> identity.** Names are never database identity. The implementing change
+> aligns the schema (global-unique index + alias table + CHECKs) with this
+> record and reconciles `DATABASE.md` §11.1 accordingly.
 
 ---
 

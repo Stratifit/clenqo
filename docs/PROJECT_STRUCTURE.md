@@ -251,6 +251,23 @@ Actual URL naming can be adjusted without changing domain boundaries.
 
 ---
 
+> **Resolved (C8-1 — Change 8 decision record):** the actual URL structure for
+> the implemented V1 is `/login` (+ `/setup` one-time bootstrap, BD-A1) and
+> one protected `/admin` surface carrying an explicit server-resolved
+> branch context (query parameter + cookie echo; BRANCH_SYSTEM §12 record) —
+> not slug-scoped `/<branch-slug>/admin` routes, which remain a documented
+> future evolution. Route groups (`(public)`, `(booking)`, `(customer)`,
+> `(admin)`) organize code; `(public)`/`(booking)`/`(customer)` are created by
+> their own future changes, not by the Admin Foundation. **Implemented
+> (Change 8):** `app/(auth)/login/page.tsx`, `app/(auth)/setup/page.tsx`, and
+> `app/(admin)/admin/*` — the existing branches/employees/jobs pages moved
+> into the `(admin)` group byte-identical (URLs `/admin/branches`,
+> `/admin/employees`, `/admin/jobs` unchanged) under the shared protected
+> shell (`layout.tsx`: permission-aware nav, context selector, account
+> menu, sign out). The `bookings/customers/services/pricing/website/
+> payments/invoices/quality/reports/users/settings` directories in the
+> conceptual tree above remain future consumer routes, not Change 8 scope.
+
 # 13. Cleaner Routes
 
 Cleaner operations should have a mobile-first experience.
@@ -421,6 +438,14 @@ features/
 ├── audit/
 └── administration/
 ```
+
+> **Implemented (Change 8, `create-admin-foundation`):** `features/admin/`
+> hosts the Admin Foundation capability — `auth.ts` (one-time bootstrap,
+> invitation, deactivation), `context.ts`/`contextShared.ts` (server-resolved
+> admin/branch context + client-safe echo format), `authActions.ts`
+> (sign-out server action). The `administration/` name in the conceptual
+> tree above maps to `features/admin/`; no new permissions, roles, or auth
+> systems were introduced.
 
 ---
 
@@ -612,6 +637,13 @@ currentSession()
 ```
 
 Actual implementation follows Supabase architecture.
+
+> **Implemented (Change 8, `create-admin-foundation`):** `lib/session/server.ts`
+> remains the single session accessor; `middleware.ts` (repo root) refreshes
+> Supabase session cookies and redirects unauthenticated `/admin/*` requests
+> to `/login?next=<safe-path>` — UX-level protection only, with the admin
+> layout guard, server actions, and RLS remaining the security boundary
+> (SECURITY.md §14 record).
 
 ---
 
